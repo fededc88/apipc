@@ -19,11 +19,11 @@ extern volatile tIpcController g_sIpcController1;
 extern volatile tIpcController g_sIpcController2;
 
 /**
- * @fn IpcDa_Init
+ * @fn ipc_init
  *
- * @brief Initialize IPC Driver Application
+ * @brief Initialize IPC API
  */
-void IpcDa_Init(void);
+void apipc_init(void);
 
 
 void IpcDa_Init_r_config(void);
@@ -44,7 +44,7 @@ void IpcDa_app(void);
  * @param [in]
  * @param [in]
  */
-void GSxM_register_l_r_w_addr(enum ipc_driver_app_addr_ind ind, uint32_t paddr,
+void GSxM_register_l_r_w_addr(enum apipc_addr_ind ind, uint32_t paddr,
 	                      size_t size);
 
 //

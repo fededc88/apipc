@@ -6,9 +6,9 @@
  * Defines
  */
 // gsxm blocks that master cpu1 reserverd for ipc driver app
-#define CPU01_TO_CPU02_GSxRAM GS3_ACCESS|GS4_ACCESS|GS5_ACCESS
+#define APIPC_CPU01_TO_CPU02_GSxRAM GS3_ACCESS|GS4_ACCESS|GS5_ACCESS
 // gsxm blocks that master cpu2 reserverd for ipc driver app
-#define CPU02_TO_CPU01_GSxRAM GS1_ACCESS|GS2_ACCESS|GS6_ACCESS
+#define APIPC_CPU02_TO_CPU01_GSxRAM GS1_ACCESS|GS2_ACCESS|GS6_ACCESS
 
 //GS3SARAM Start Address
 #define CPU01_TO_CPU02_R_W_DATA_START (uint32_t)0x0000F000  
@@ -24,38 +24,37 @@
 // Local R_W_DATA length space
 #define CL_R_W_DATA_LENGTH 4096
 
-enum ipcda_sm
+enum apipc_sm
 {
-    IPCDA_SM_UNKNOWN = 0,
-    IPCDA_SM_IDLE,
-    IPCDA_SM_READING_CONFIG,
-    IPCDA_SM_WRITING_CONFIG,
-    IPCDA_SM_WAITTING_REMOTE_RESPONSE,
+    APIPC_SM_UNKNOWN = 0,
+    APIPC_SM_IDLE,
+    APIPC_SM_READING_CONFIG,
+    APIPC_SM_WRITING_CONFIG,
+    APIPC_SM_WAITTING_REMOTE_RESPONSE,
 
 };
 
-enum ipc_driver_app_addr_ind
+enum apipc_addr_ind
 {
-    IPCDA_RADDR_CONFIG = 0,
-    IPCDA_RADDR_VARS,
-    IPCDA_RADDR_VARS_RATED,
-    IPCDA_RADDR_TOTAL,
-    IPCDA_RADDR_CMD_ON,
-
+    APIPC_RADDR_CONFIG = 0,
+    APIPC_RADDR_VARS,
+    APIPC_RADDR_VARS_RATED,
+    APIPC_RADDR_TOTAL,
 };
 
-enum ipc_driver_app_flags
+enum apipc_flags
 {
-    IPCDA_FLAG_R_CPU_INIT = IPC_FLAG17,
-    IPCDA_FLAG_GSMEM_ACCES = IPC_FLAG18,
-    IPCDA_FLAG_CPU1_L_R_ADDR = IPC_FLAG19,
-    IPCDA_FLAG_CPU2_L_R_ADDR = IPC_FLAG20,
-    IPCDA_FLAG_R_L_BLOCK_RECEIVED = IPC_FLAG21,
+    APIPC_FLAG_API_INITED = IPC_FLAG4, /* Local API implementation is inited */
+    APIPC_FLAG_SRAM_ACCES = IPC_FLAG5, /* Local (CPU1) granted GSMEM acces to CPU2 */
+
+
+    IPC_FLAG_L_R_ADDR = IPC_FLAG19,
+    IPC_FLAG_BLOCK_RECEIVED = IPC_FLAG21,
 };
 
 #endif
 
-struct ipcda_addr_obj
+struct apipc_addr_obj
 {
     uint32_t addr;
     size_t len;
