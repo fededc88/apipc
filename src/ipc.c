@@ -17,7 +17,7 @@
 #include "F2837xD_Examples.h"      // F2837xD Examples Include File
 
 #include "ipc.h"
-#include "mymalloc.h"
+#include "../lib/mymalloc/mymalloc.h"
 
 #include "objects.h"
 
