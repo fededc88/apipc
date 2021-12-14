@@ -1,0 +1,3 @@
+[submodule "lib/mymalloc"]
+	path = lib/mymalloc
+	url = git@github.com:fededc88/mymalloc.git
