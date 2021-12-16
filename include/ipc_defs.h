@@ -54,10 +54,22 @@ enum apipc_flags
 
 #endif
 
-struct apipc_addr_obj
+enum apipc_obj_type
+{ 
+    ND = 0,
+    BLOCK = 1,
+    DATA = 2,
+    FLAGS = 3,
+};
+
+struct apipc_obj
 {
+    enum apipc_obj_type type;
     uint32_t addr;
     size_t len;
+    uint16_t f_startup:1;
+    uint16_t f_inited:1;
+    uint16_t f_spare:14;
 };
 
 //

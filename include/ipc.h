@@ -34,7 +34,7 @@ void IpcDa_Init_r_config(void);
  *
  * @brief Initialize IPC Driver Application
  */
-void IpcDa_app(void);
+void apipc_app(void);
 
 /**
  * @fn GSxM_register_l_r_w_addr()

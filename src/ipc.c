@@ -19,18 +19,16 @@
 #include "ipc.h"
 #include "../lib/mymalloc/mymalloc.h"
 
-#include "objects.h"
-
 /* ipclib shared buffers space allocation */
 // NOTE: space is allocated depending on the .cmd file included in the project
 #pragma DATA_SECTION(cl_r_w_data,".cpul_cpur_data");
-#pragma DATA_SECTION(cl_r_w_addr,".base_cpul_cpur_addr");
-#pragma DATA_SECTION(cr_r_addr,".base_cpur_cpul_addr");
+#pragma DATA_SECTION(l_apipc_obj,".base_cpul_cpur_addr");
+#pragma DATA_SECTION(r_apipc_obj,".base_cpur_cpul_addr");
 
 /* ipclib shared buffers space declaration */
 uint16_t  cl_r_w_data[CL_R_W_DATA_LENGTH];            // mapped to .cpul_cpur_data of shared RAM owned by local cpu.
-struct apipc_addr_obj cl_r_w_addr[APIPC_RADDR_TOTAL]; // mapped to .base_cpul_cpur_addr of shared RAM owned by local cpu.
-struct apipc_addr_obj cr_r_addr[APIPC_RADDR_TOTAL];   // mapped to .base_cpur_cpul_addr of shared RAM owned by remote cpu.
+struct apipc_obj l_apipc_obj[APIPC_MAX_OBJ]; // mapped to .base_cpul_cpur_addr of shared RAM owned by local cpu.
+struct apipc_obj r_apipc_obj[APIPC_MAX_OBJ];   // mapped to .base_cpur_cpul_addr of shared RAM owned by remote cpu.
 
 /* IPC API Drivers handlers declaration. */
 // NOTE: Should be declared one handler for every interrupt
@@ -125,10 +123,14 @@ void apipc_init(void)
  */
 //TODO: desarrollar una funcion que me permita registar la dirección de una
 //variable en el lugar correspondiente segund estructura
-void GSxM_register_l_r_w_addr(enum apipc_addr_ind ind, uint32_t paddr, size_t size)
+void apipc_new_obj(uint16_t obj_idx, enum apipc_obj_type, void *paddr, size_t size)
 {
-    cl_r_w_addr[ind].addr = paddr;
-    cl_r_w_addr[ind].len = size;
+    
+    if( l_apipc_obj[obj_idx].addr != NULL)
+        return;
+
+    l_apipc_obj[obj_idx].addr = paddr;
+    l_apipc_obj[obj_idx].len = size;
 }
 
 static void IpcDa_Load_Addr(void)
@@ -167,7 +169,7 @@ void IpcDa_Init_r_config(void)
 		break;
 
 	    case APIPC_SM_WRITING_CONFIG:
-		IpcDa_sendblock((void *)cl_r_w_addr[block_idx].addr, cl_r_w_addr[block_idx].len, (uint16_t *)0x0F000, (void *)cr_r_addr[block_idx].addr, IPC_FLAG_BLOCK_RECEIVED);
+		IpcDa_sendblock((void *)l_apipc_obj[block_idx].addr, l_apipc_obj[block_idx].len, (uint16_t *)0x0F000, (void *)r_apipc_obj[block_idx].addr, IPC_FLAG_BLOCK_RECEIVED);
 		IpcDa_SM = APIPC_SM_WAITTING_REMOTE_RESPONSE;
 		break;
 
@@ -195,7 +197,7 @@ static void IpcDa_sendblock(void *pdata, size_t ndata, uint16_t *pGSxM, void *pr
 	                  (uint16_t)ndata, IPC_LENGTH_16_BITS, ENABLE_BLOCKING, ulResponseFlag);
 }
 
-void IpcDa_app(void)
+void apipc_app(void)
 {
 
     static enum apipc_sm IpcDa_SM = APIPC_SM_UNKNOWN;
