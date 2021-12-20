@@ -88,7 +88,7 @@ static void apipc_check_remote_cpu_init(void)
 #elif defined ( CPU2 )
 
     /* Wait here until CPU1 has started */
-    while(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) != 0)
+    while(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) != 1)
     {
 	// TODO: this wait should be timed
     }
