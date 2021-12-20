@@ -25,27 +25,34 @@ extern volatile tIpcController g_sIpcController2;
  */
 void apipc_init(void);
 
-
-void IpcDa_Init_r_config(void);
-
+/**
+ * @fn apipc_register_obj
+ *
+ * @brief Register an IPC API object
+ */
+enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
+        void *paddr, size_t size);
 
 /**
- * @fn IpcDa_app
+ * @fn apipc_send
  *
- * @brief Initialize IPC Driver Application
+ * @brief Start a comunication over IPC API 
+ */
+enum apipc_rc apipc_send(uint16_t obj_idx);
+
+/**
+ * @fn apipc_init_config
+ *
+ * @brief Start a comunication over IPC API 
+ */
+void apipc_init_config(void);
+
+/**
+ * @fn apipc_app
+ *
+ * @brief apipc application
  */
 void apipc_app(void);
-
-/**
- * @fn GSxM_register_l_r_w_addr()
- *
- * @brief 
- *
- * @param [in]
- * @param [in]
- */
-void GSxM_register_l_r_w_addr(enum apipc_addr_ind ind, uint32_t paddr,
-	                      size_t size);
 
 //
 // IPC interrupt Handlers Functions declarations

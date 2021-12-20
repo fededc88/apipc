@@ -40,6 +40,7 @@ mymalloc_handler l_r_w_data_h;
 
 /* statics functions prototipes declarations */
 static void apipc_sram_acces_config(void);
+static void apipc_check_remote_cpu_init(void);
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -76,7 +77,8 @@ static void apipc_sram_acces_config(void)
 #endif
 }
 
-static void apipc_check_remote_cpu_init(void){
+static void apipc_check_remote_cpu_init(void)
+{
 
 #if defined ( CPU1 )
 
@@ -123,108 +125,144 @@ void apipc_init(void)
  */
 //TODO: desarrollar una funcion que me permita registar la dirección de una
 //variable en el lugar correspondiente segund estructura
-void apipc_new_obj(uint16_t obj_idx, enum apipc_obj_type, void *paddr, size_t size)
+enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type, void *paddr, size_t size)
 {
-    
-    if( l_apipc_obj[obj_idx].addr != NULL)
-        return;
+    enum apipc_rc rc;
+    struct apipc_obj *plobj;
 
-    l_apipc_obj[obj_idx].addr = paddr;
-    l_apipc_obj[obj_idx].len = size;
-}
+    rc = APIPC_RC_SUCCESS;
+    plobj = &l_apipc_obj[obj_idx];
 
-static void IpcDa_Load_Addr(void)
-{
-    extern Uint16 F_cmd_ON;
+    if( plobj->paddr != NULL)
+        return APIPC_RC_FAIL;
 
-    GSxM_register_l_r_w_addr(APIPC_RADDR_CONFIG, (uint32_t) &config, sizeof(config));
-    GSxM_register_l_r_w_addr(APIPC_RADDR_VARS, (uint32_t) &vars, sizeof(vars));
-    GSxM_register_l_r_w_addr(APIPC_RADDR_VARS_RATED, (uint32_t) &vars_rated, sizeof(vars_rated));
+    plobj->paddr = paddr;
+    plobj->len = size;
 
-}
-
-#if defined( CPU1 )
-
-void IpcDa_Init_r_config(void)
-{
-    static enum apipc_sm IpcDa_SM = APIPC_SM_UNKNOWN;
-    uint16_t f_end_r_config = 0;
-    uint16_t block_idx;
-
-    while(!f_end_r_config)
-    {
-	switch(IpcDa_SM)
-	{
-	    case APIPC_SM_UNKNOWN:
-		block_idx = 0;
-		f_end_r_config = 0;
-		IpcDa_SM = APIPC_SM_IDLE;
-		break;
-
-	    case APIPC_SM_IDLE:
-		if(block_idx < APIPC_RADDR_TOTAL)
-		    IpcDa_SM = APIPC_SM_WRITING_CONFIG;
-		else
-		    f_end_r_config = 1;
-		break;
-
-	    case APIPC_SM_WRITING_CONFIG:
-		IpcDa_sendblock((void *)l_apipc_obj[block_idx].addr, l_apipc_obj[block_idx].len, (uint16_t *)0x0F000, (void *)r_apipc_obj[block_idx].addr, IPC_FLAG_BLOCK_RECEIVED);
-		IpcDa_SM = APIPC_SM_WAITTING_REMOTE_RESPONSE;
-		break;
-
-	    case APIPC_SM_WAITTING_REMOTE_RESPONSE:
-		if(!IPCRtoLFlagBusy(IPC_FLAG_BLOCK_RECEIVED))
-		{
-		    block_idx++;
-		    IpcDa_SM = APIPC_SM_IDLE;
-		}
-		break;
-	}
-    }
+    return rc;
 }
 
 //
 // Write Memory Block through GSRAM  
 //
 // NOTE: This is an experimental test
-static void IpcDa_sendblock(void *pdata, size_t ndata, uint16_t *pGSxM, void *premdata, uint32_t ulResponseFlag)
+enum apipc_rc apipc_send(uint16_t obj_idx)
 {
-    // Place the data to write in shared memory
-    u16memcpy(pGSxM, pdata, ndata);
-   
-    IPCLtoRBlockWrite(&g_sIpcController2,(uint32_t)premdata, (uint32_t)pGSxM,
-	                  (uint16_t)ndata, IPC_LENGTH_16_BITS, ENABLE_BLOCKING, ulResponseFlag);
+    enum apipc_rc rc;
+
+    struct apipc_obj *plobj;
+    struct apipc_obj *probj;
+
+
+    rc = APIPC_RC_SUCCESS;
+    plobj = &l_apipc_obj[obj_idx];
+    probj = &r_apipc_obj[obj_idx];
+
+    /* Check that l & r objects are initialized */
+    if( (probj->paddr == NULL) || (plobj->paddr == NULL) )
+        return APIPC_RC_FAIL;
+
+    switch(plobj->type)
+    {
+        case APIPC_OBJ_TYPE_BLOCK:
+
+            /* Allocates spaces for a block on the statically reserved mem space */
+            plobj->pGSxM = (uint16_t *) mymalloc(l_r_w_data_h, plobj->len);
+
+            if(plobj->pGSxM == NULL){
+                rc = APIPC_RC_FAIL;
+                break; 
+            }
+
+            // Place the data to write in shared memory
+            u16memcpy(plobj->pGSxM, plobj->paddr, plobj->len);
+
+            if( STATUS_FAIL == IPCLtoRBlockWrite(&g_sIpcController2,(uint32_t)probj->paddr, (uint32_t)plobj->pGSxM,
+                        (uint16_t)plobj->len, IPC_LENGTH_16_BITS, DISABLE_BLOCKING))
+            {
+                myfree(l_r_w_data_h, plobj->pGSxM);
+                plobj->pGSxM = NULL;
+                rc = APIPC_RC_FAIL;
+                break;
+            }
+
+            break;
+
+        default:
+            break;
+    }
+            return rc;
+}
+
+#if defined( CPU1 )
+
+void apipc_init_config(void)
+{
+    /*
+    static enum apipc_sm init_config_sm = APIPC_SM_UNKNOWN;
+
+    uint16_t f_end_r_config = 0;
+    uint16_t block_idx;
+
+	switch(init_config_sm)
+	{
+	    case APIPC_SM_UNKNOWN:
+		block_idx = 0;
+		f_end_r_config = 0;
+		init_config_sm = APIPC_SM_IDLE;
+		break;
+
+	    case APIPC_SM_IDLE:
+		if(block_idx < APIPC_RADDR_TOTAL)
+		    init_config_sm = APIPC_SM_WRITING_CONFIG;
+		else
+		    f_end_r_config = 1;
+		break;
+
+	    case APIPC_SM_WRITING_CONFIG:
+		IpcDa_sendblock((void *)l_apipc_obj[block_idx].paddr, l_apipc_obj[block_idx].len, (uint16_t *)0x0F000, (void *)r_apipc_obj[block_idx].paddr);
+		init_config_sm = APIPC_SM_WAITTING_REMOTE_RESPONSE;
+		break;
+
+	    case APIPC_SM_WAITTING_REMOTE_RESPONSE:
+		if(!IPCRtoLFlagBusy(IPC_FLAG_BLOCK_RECEIVED))
+		{
+		    block_idx++;
+		    init_config_sm = APIPC_SM_IDLE;
+		}
+		break;
+	}
+    
+    */
 }
 
 void apipc_app(void)
 {
+    static enum apipc_sm apipc_app_sm = APIPC_SM_UNKNOWN;
 
-    static enum apipc_sm IpcDa_SM = APIPC_SM_UNKNOWN;
-
-    switch(IpcDa_SM)
+    switch(apipc_app_sm)
     {
-	case APIPC_SM_UNKNOWN:
-	    break;
+        case APIPC_SM_UNKNOWN:
+            if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
+                apipc_app_sm = APIPC_SM_INIT_REMOTE_CONFIG;
+            break;
 
-	case APIPC_SM_IDLE:
+        case APIPC_SM_IDLE:
+            break;
 
-	case APIPC_SM_WRITING_CONFIG:
-	    break;
+        case APIPC_SM_INIT_REMOTE_CONFIG:
+            apipc_init_config();
+            break;
 
-	case APIPC_SM_READING_CONFIG:
-	    break;
-
-	case APIPC_SM_WAITTING_REMOTE_RESPONSE:
-	    break;
+        case APIPC_SM_STARTED:
+            break;
     }
 
 }
-#elif defined(CPU2)
-void IpcDa_Init_r_config(void)
-{}
-#endif
 
+#elif defined(CPU2)
+
+#endif
 
 //
 // RtoLIPC0IntHandler - Handler writes into CPU01 addesses as a result of

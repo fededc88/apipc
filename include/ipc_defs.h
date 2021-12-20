@@ -24,14 +24,25 @@
 // Local R_W_DATA length space
 #define CL_R_W_DATA_LENGTH 4096
 
+// Maximum number of object apipc can handle
+#define APIPC_MAX_OBJ 10
+
 enum apipc_sm
 {
     APIPC_SM_UNKNOWN = 0,
     APIPC_SM_IDLE,
+    APIPC_SM_INIT_REMOTE_CONFIG,
+    APIPC_SM_STARTED,
     APIPC_SM_READING_CONFIG,
     APIPC_SM_WRITING_CONFIG,
     APIPC_SM_WAITTING_REMOTE_RESPONSE,
 
+};
+
+enum apipc_rc
+{
+    APIPC_RC_FAIL = -1,
+    APIPC_RC_SUCCESS = 0
 };
 
 enum apipc_addr_ind
@@ -52,26 +63,26 @@ enum apipc_flags
     IPC_FLAG_BLOCK_RECEIVED = IPC_FLAG21,
 };
 
-#endif
-
 enum apipc_obj_type
 { 
-    ND = 0,
-    BLOCK = 1,
-    DATA = 2,
-    FLAGS = 3,
+    APIPC_OBJ_TYPE_ND = 0,
+    APIPC_OBJ_TYPE_BLOCK = 1,
+    APIPC_OBJ_TYPE_DATA = 2,
+    APIPC_OBJ_TYPE_FLAGS = 3,
 };
 
 struct apipc_obj
 {
     enum apipc_obj_type type;
-    uint32_t addr;
+    void *paddr;
     size_t len;
+    uint16_t *pGSxM;
     uint16_t f_startup:1;
     uint16_t f_inited:1;
     uint16_t f_spare:14;
 };
 
+#endif
 //
 // End of file.
 //
