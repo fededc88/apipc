@@ -57,8 +57,8 @@ void apipc_app(void);
 //
 // IPC interrupt Handlers Functions declarations
 //
-void RtoLIPC0IntHandler(void);
-void RtoLIPC1IntHandler(void);
+void apipc_ipc0_isr_handler(void);
+void apipc_ipc1_isr_handler(void);
 
 #endif
 

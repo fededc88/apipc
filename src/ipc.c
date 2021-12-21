@@ -267,7 +267,7 @@ void apipc_app(void)
 //
 // RtoLIPC0IntHandler - Handler writes into CPU01 addesses as a result of
 // read commands to CPU02.
-void RtoLIPC0IntHandler(void)
+void void apipc_ipc0_isr_handler(void)
 {
     tIpcMessage sMessage;
 
@@ -288,17 +288,17 @@ void RtoLIPC0IntHandler(void)
 	}	
 
     }
-    //
-    // Acknowledge IC INT0 Flag 
-    //
+    /* Acknowledge IC INT0 Flag */
     IpcRegs.IPCACK.bit.IPC0 = 1;
 
+    /* acknowledge the PIE group interrupt. */
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 
 //
 // RtoLIPC1IntHandler - Handles Data Block Reads/Writes
 // 
-void RtoLIPC1IntHandler(void)
+void apipc_ipc1_isr_handler(void)
 {
     tIpcMessage sMessage;
 
@@ -307,24 +307,25 @@ void RtoLIPC1IntHandler(void)
     //
     while(IpcGet(&g_sIpcController2, &sMessage, DISABLE_BLOCKING)!= STATUS_FAIL)
     {
-	switch(sMessage.ulcommand) 
-	{
+        switch(sMessage.ulcommand) 
+        {
 
-	    case IPC_BLOCK_WRITE:
-		IPCRtoLBlockWrite(&sMessage);
-		break;
-	    case IPC_BLOCK_READ:
-		IPCRtoLBlockRead(&sMessage);
-		break;
-	    default:
-		break;
-	}
+            case IPC_BLOCK_WRITE:
+                IPCRtoLBlockWrite(&sMessage);
+                break;
+            case IPC_BLOCK_READ:
+                IPCRtoLBlockRead(&sMessage);
+                break;
+            default:
+                break;
+        }
     }
 
-    //
-    // Acknowledge IC INT1 Flag 
-    //
+    /* Acknowledge IC INT1 Flag */
     IpcRegs.IPCACK.bit.IPC1 = 1;
+    
+    /* acknowledge the PIE group interrupt. */
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 
 //
