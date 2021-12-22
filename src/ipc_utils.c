@@ -7,7 +7,6 @@
 
 #include "ipc_utils.h"
 
-
 /**
  * u16memcpy() - copies n uint16_t size memory blocks from s2 to s1  
  */
@@ -73,6 +72,45 @@ void GSxM_Acces(uint32_t ulMask, uint16_t usMaster)
 	    EDIS;
 	}
     }
+}
+
+/*
+ * ipc_read_timer - Read the current IPC timer value. 
+ */
+uint64_t ipc_read_timer(void)
+{
+    uint32_t low, high;
+
+    /*
+     * The low register must be read first to latch a value in the high
+     * register.
+     */
+    low = IpcRegs.IPCCOUNTERL;
+    high = IpcRegs.IPCCOUNTERH;
+
+    return ((uint64_t)high << 32) | (uint64_t)low;
+}
+
+/*
+ * ipc_timer_expired - procces the current IPC timer. Return 1 if timer have expired 
+ */
+uint16_t ipc_timer_expired(uint64_t start, uint64_t wait) 
+{
+    uint64_t actual;
+    uint64_t delta;
+
+    actual = ipc_read_timer();
+
+    if( actual > start )
+        delta = actual - start;
+    else
+        delta = actual + (~start);
+
+    if( delta > wait ) 
+        return 1;
+    else 
+        return 0;
+
 }
 
 #endif

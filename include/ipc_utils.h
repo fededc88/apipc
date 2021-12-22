@@ -7,6 +7,22 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if CPU_FRQ_200MHZ
+#define IPC_TIMER_WAIT_1mS 200000ll
+#define IPC_TIMER_WAIT_2mS 400000ll
+#define IPC_TIMER_WAIT_5mS 1000000ll
+#define IPC_TIMER_WAIT_10mS 2000000ll
+#define IPC_TIMER_WAIT_20mS 4000000ll
+#define IPC_TIMER_WAIT_50mS 50000000ll
+#define IPC_TIMER_WAIT_100mS 20000000ll
+#define IPC_TIMER_WAIT_200mS 40000000ll
+#define IPC_TIMER_WAIT_500mS 100000000ll
+#define IPC_TIMER_WAIT_1S 200000000ll
+#define IPC_TIMER_WAIT_2S 400000000ll
+#define IPC_TIMER_WAIT_5S 1000000000ll
+#define IPC_TIMER_WAIT_10S 2000000000ll
+#endif
+
 /**
  * @fn u16memcpy()
  *
@@ -44,8 +60,40 @@
  * IPC_GSX_CPU1_MASTER.
  * The ulMask parameter can be any of the options: S0_ACCESS - S7_ACCESS.
  */
-
 void GSxM_Acces(uint32_t ulMask, uint16_t usMaster);
+
+/**
+ * @fn ipc_read_timer
+ *
+ * @brief Read the current IPC timer value.
+ *
+ * @return IPCCOUNTER H/L value
+ *
+ * A 64-bit free-running counter is present in the device and can be used to
+ * timestamp IPC events between processors or timerize process.
+ * This function will read the current ipc IPCCOUNTERH/L register and return his
+ * value. 
+ */
+uint64_t ipc_read_timer(void);
+
+/**
+ * @fn ipc_timer_expired
+ *
+ * @brief Use ipc IPCCOUNTER register to function as timer for ipc applications.
+ *
+ * @param [in] start IPCCOUNTERH/L value at the time the timer is started. Value
+ *                   should be preserved until timer expires.
+ * @param [in] wait time timer will wait until expires in counts.
+ *
+ * @return 1 if timer have expired, 0 if not. 
+ *
+ * A 64-bit free-running counter is present in the device and can be used to
+ * timestamp IPC events between processors or timerize process.
+ * This function will read the current ipc IPCCOUNTERH/L register value and
+ * compares it to start time to check if wait time have been completed.
+ */
+uint16_t ipc_timer_expired(uint64_t start, uint64_t wait);
+
 #endif
 
 //
