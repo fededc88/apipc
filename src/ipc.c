@@ -204,15 +204,35 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
             // Place the data to write in shared memory
             u16memcpy(plobj->pGSxM, plobj->paddr, plobj->len);
 
-            if( STATUS_FAIL == IPCLtoRBlockWrite(&g_sIpcController2,(uint32_t)probj->paddr, (uint32_t)plobj->pGSxM,
-                        (uint16_t)plobj->len, IPC_LENGTH_16_BITS, DISABLE_BLOCKING))
+            if(STATUS_FAIL == IPCLtoRBlockWrite(&g_sIpcController2,
+                                                (uint32_t)probj->paddr, 
+                                                (uint32_t)plobj->pGSxM,
+                                                (uint16_t)plobj->len,
+                                                IPC_LENGTH_16_BITS, DISABLE_BLOCKING))
             {
                 myfree(l_r_w_data_h, plobj->pGSxM);
                 plobj->pGSxM = NULL;
                 rc = APIPC_RC_FAIL;
                 break;
             }
+            break;
 
+        case APIPC_OBJ_TYPE_DATA:
+
+            if(plobj->len > 2)
+            {
+                rc = APIPC_RC_FAIL;
+                break;
+            }
+
+            if(STATUS_FAIL == IPCLtoRDataWrite(&g_sIpcController2,
+                                               (uint32_t)probj->paddr,
+                                               (uint32_t) *(uint32_t *)plobj->paddr,
+                                               (uint16_t)plobj->len,
+                                               DISABLE_BLOCKING, NO_FLAG))
+            {
+                rc = APIPC_RC_FAIL;
+            }
             break;
 
         default:
@@ -415,6 +435,10 @@ interrupt void apipc_ipc1_isr_handler(void)
     {
         switch(sMessage.ulcommand) 
         {
+            case IPC_DATA_WRITE:
+                IPCRtoLDataWrite(&sMessage);
+                break;
+
             case IPC_BLOCK_READ:
                 IPCRtoLBlockRead(&sMessage);
                 break;
