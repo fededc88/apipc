@@ -31,7 +31,7 @@ void apipc_init(void);
  * @brief Register an IPC API object
  */
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
-        void *paddr, size_t size);
+                                 void *paddr, size_t size, uint16_t startup);
 
 /**
  * @fn apipc_send
@@ -41,11 +41,13 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
 enum apipc_rc apipc_send(uint16_t obj_idx);
 
 /**
- * @fn apipc_init_config
+ * @fn apipc_startup_config
  *
  * @brief Start a comunication over IPC API 
  */
-void apipc_init_config(void);
+enum apipc_rc apipc_startup_config(void);
+
+void apipc_proc_obj(struct apipc_obj *plobj);
 
 /**
  * @fn apipc_app
@@ -54,11 +56,9 @@ void apipc_init_config(void);
  */
 void apipc_app(void);
 
-//
-// IPC interrupt Handlers Functions declarations
-//
-void apipc_ipc0_isr_handler(void);
-void apipc_ipc1_isr_handler(void);
+/* IPC interrupt Handlers Functions declarations */
+interrupt void apipc_ipc0_isr_handler(void);
+interrupt void apipc_ipc1_isr_handler(void);
 
 #endif
 

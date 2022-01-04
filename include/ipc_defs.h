@@ -30,13 +30,32 @@
 enum apipc_sm
 {
     APIPC_SM_UNKNOWN = 0,
+    APIPC_SM_INIT,
     APIPC_SM_IDLE,
-    APIPC_SM_INIT_REMOTE_CONFIG,
-    APIPC_SM_STARTED,
-    APIPC_SM_READING_CONFIG,
-    APIPC_SM_WRITING_CONFIG,
-    APIPC_SM_WAITTING_REMOTE_RESPONSE,
+    APIPC_SM_STARTUP_REMOTE_CONFIG,
+    APIPC_SM_READING,
+    APIPC_SM_WRITING,
+    APIPC_SM_WAITTING_RESPONSE,
+    APIPC_SM_STARTED
+};
 
+enum apipc_startup_sm
+{
+    APIPC_SU_SM_UNKNOWN = 0,
+    APIPC_SU_SM_INIT,
+    APIPC_SU_SM_STARTING,
+    APIPC_SU_SM_FINISHED,
+};
+
+enum apipc_obj_sm
+{
+    APIPC_OBJ_SM_UNKNOWN = 0,
+    APIPC_OBJ_SM_INIT,
+    APIPC_OBJ_SM_IDLE,
+    APIPC_OBJ_SM_WRITING,
+    APIPC_OBJ_SM_WAITTING_RESPONSE,
+    APIPC_OBJ_SM_RETRY,
+    APIPC_OBJ_SM_STARTED,
 };
 
 enum apipc_rc
@@ -71,15 +90,23 @@ enum apipc_obj_type
     APIPC_OBJ_TYPE_FLAGS = 3,
 };
 
+struct apipc_obj_flag
+{
+    uint16_t startup:1;
+    uint16_t spare:15;
+};
+
 struct apipc_obj
 {
+    uint16_t idx;
     enum apipc_obj_type type;
+    enum apipc_obj_sm obj_sm;
     void *paddr;
     size_t len;
     uint16_t *pGSxM;
-    uint16_t f_startup:1;
-    uint16_t f_inited:1;
-    uint16_t f_spare:14;
+    uint64_t timer;
+    uint16_t retry;
+    struct apipc_obj_flag flag;
 };
 
 #endif

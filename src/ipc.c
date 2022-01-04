@@ -41,6 +41,7 @@ mymalloc_handler l_r_w_data_h;
 /* statics functions prototipes declarations */
 static void apipc_sram_acces_config(void);
 static void apipc_check_remote_cpu_init(void);
+static void apipc_init_objs(void);
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -77,6 +78,7 @@ static void apipc_sram_acces_config(void)
 #endif
 }
 
+/* apipc_check_remote_cpu_init: */
 static void apipc_check_remote_cpu_init(void)
 {
 
@@ -99,6 +101,19 @@ static void apipc_check_remote_cpu_init(void)
 
 }
 
+/* apipc_init_objs: */
+static void apipc_init_objs(void)
+{
+    uint16_t obj_idx;
+    struct apipc_obj *plobj;
+
+    plobj = l_apipc_obj;
+
+    for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++)
+        plobj->paddr = NULL;
+}
+
+
  /* apipc_init: Initialize ipc API  */
 void apipc_init(void)
 {
@@ -111,6 +126,9 @@ void apipc_init(void)
 
     /* Initialize mymalloc handler to allocate cl_r_w_data data dynamically */
     l_r_w_data_h = mymalloc_init_array((void*)cl_r_w_data, (size_t)CL_R_W_DATA_LENGTH);
+
+    /* initialize the objs array to a known state */
+    apipc_init_objs();
 
     /* Set up IPC interrupts PIEIERx Registers */
     PieCtrlRegs.PIEIER1.bit.INTx13 = 1; // Set the apropropiate PIEIERx bit for IPC0
@@ -125,7 +143,8 @@ void apipc_init(void)
  */
 //TODO: desarrollar una funcion que me permita registar la dirección de una
 //variable en el lugar correspondiente segund estructura
-enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type, void *paddr, size_t size)
+enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
+                                 void *paddr, size_t size, uint16_t startup)
 {
     enum apipc_rc rc;
     struct apipc_obj *plobj;
@@ -133,11 +152,19 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
     rc = APIPC_RC_SUCCESS;
     plobj = &l_apipc_obj[obj_idx];
 
-    if( plobj->paddr != NULL)
+    if(plobj->paddr != NULL)
         return APIPC_RC_FAIL;
 
+    plobj->idx = obj_idx;
+    plobj->type = obj_type;
+    plobj->obj_sm = APIPC_OBJ_SM_UNKNOWN;
     plobj->paddr = paddr;
     plobj->len = size;
+
+    if(startup)
+        plobj->flag.startup = 1;
+    else
+        plobj->flag.startup = 0;
 
     return rc;
 }
@@ -191,49 +218,128 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
         default:
             break;
     }
-            return rc;
+
+    return rc;
 }
 
 #if defined( CPU1 )
 
-void apipc_init_config(void)
+enum apipc_rc apipc_startup_config(void)
 {
-    /*
-    static enum apipc_sm init_config_sm = APIPC_SM_UNKNOWN;
+    static enum apipc_rc rc;
+    static enum apipc_startup_sm apipc_startup_sm = APIPC_SU_SM_UNKNOWN;
+    static struct apipc_obj *plobj;
 
-    uint16_t f_end_r_config = 0;
-    uint16_t block_idx;
+    static uint16_t obj_idx;
+    static uint16_t startup_finished = 0;
 
-	switch(init_config_sm)
-	{
-	    case APIPC_SM_UNKNOWN:
-		block_idx = 0;
-		f_end_r_config = 0;
-		init_config_sm = APIPC_SM_IDLE;
-		break;
 
-	    case APIPC_SM_IDLE:
-		if(block_idx < APIPC_RADDR_TOTAL)
-		    init_config_sm = APIPC_SM_WRITING_CONFIG;
-		else
-		    f_end_r_config = 1;
-		break;
+    switch(apipc_startup_sm)
+    {
+        case APIPC_SU_SM_UNKNOWN:
+            apipc_startup_sm = APIPC_SU_SM_INIT;
 
-	    case APIPC_SM_WRITING_CONFIG:
-		IpcDa_sendblock((void *)l_apipc_obj[block_idx].paddr, l_apipc_obj[block_idx].len, (uint16_t *)0x0F000, (void *)r_apipc_obj[block_idx].paddr);
-		init_config_sm = APIPC_SM_WAITTING_REMOTE_RESPONSE;
-		break;
+        case APIPC_SU_SM_INIT:
 
-	    case APIPC_SM_WAITTING_REMOTE_RESPONSE:
-		if(!IPCRtoLFlagBusy(IPC_FLAG_BLOCK_RECEIVED))
-		{
-		    block_idx++;
-		    init_config_sm = APIPC_SM_IDLE;
-		}
-		break;
-	}
-    
-    */
+            rc = APIPC_RC_FAIL;
+            startup_finished = 1;
+            plobj = l_apipc_obj;
+            obj_idx = 0;
+            apipc_startup_sm = APIPC_SU_SM_STARTING;
+            break;
+
+        case APIPC_SU_SM_STARTING:
+
+            apipc_proc_obj(plobj);
+
+            if(plobj->obj_sm != APIPC_OBJ_SM_UNKNOWN && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
+                startup_finished = 0;
+
+            plobj++;
+            obj_idx++;
+
+            if(obj_idx >= APIPC_MAX_OBJ)
+            {
+                if(startup_finished)
+                    apipc_startup_sm = APIPC_SU_SM_FINISHED;
+                else
+                    apipc_startup_sm = APIPC_SU_SM_INIT;
+            }
+            break;
+
+        case APIPC_SU_SM_FINISHED:
+            rc = APIPC_RC_SUCCESS;
+            break;
+
+    }
+
+    return rc;
+}
+
+
+void apipc_proc_obj(struct apipc_obj *plobj)
+{
+    static enum apipc_rc rc;
+
+    switch(plobj->obj_sm)
+    {
+        case APIPC_OBJ_SM_UNKNOWN:
+            if(plobj->paddr == NULL)
+                break;
+
+        case APIPC_OBJ_SM_INIT:
+            if(plobj->flag.startup)
+            {
+                plobj->retry = 3;
+                plobj->obj_sm = APIPC_OBJ_SM_WRITING;
+            }
+            else
+                plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+            
+            break;
+
+        case APIPC_OBJ_SM_WRITING:
+
+            if(apipc_send(plobj->idx) == APIPC_RC_SUCCESS)
+            {
+                plobj->timer = ipc_read_timer();
+                plobj->obj_sm = APIPC_OBJ_SM_WAITTING_RESPONSE;
+            }
+            else if (plobj->retry)
+            {
+                plobj->timer = ipc_read_timer();
+                plobj->retry--;
+                plobj->obj_sm = APIPC_OBJ_SM_RETRY;
+            }
+            else
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+
+            break;
+
+        case APIPC_OBJ_SM_WAITTING_RESPONSE:
+
+            if(ipc_timer_expired(plobj->timer, IPC_TIMER_WAIT_5mS))
+            {
+                myfree(l_r_w_data_h, plobj->pGSxM);
+                plobj->pGSxM = NULL;
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+            }
+            break;
+
+        case APIPC_OBJ_SM_RETRY:
+
+            if(ipc_timer_expired(plobj->timer, IPC_TIMER_WAIT_5mS))
+            {
+                plobj->obj_sm = APIPC_OBJ_SM_WRITING;
+            }
+            break;
+
+        case APIPC_OBJ_SM_STARTED:
+            break;
+
+        case APIPC_OBJ_SM_IDLE:
+            break;
+    }
 }
 
 void apipc_app(void)
@@ -244,14 +350,15 @@ void apipc_app(void)
     {
         case APIPC_SM_UNKNOWN:
             if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
-                apipc_app_sm = APIPC_SM_INIT_REMOTE_CONFIG;
+                apipc_app_sm = APIPC_SM_STARTUP_REMOTE_CONFIG;
             break;
 
         case APIPC_SM_IDLE:
             break;
 
-        case APIPC_SM_INIT_REMOTE_CONFIG:
-            apipc_init_config();
+        case APIPC_SM_STARTUP_REMOTE_CONFIG:
+            if(!apipc_startup_config())
+                apipc_app_sm = APIPC_SM_STARTED;
             break;
 
         case APIPC_SM_STARTED:
@@ -267,7 +374,7 @@ void apipc_app(void)
 //
 // RtoLIPC0IntHandler - Handler writes into CPU01 addesses as a result of
 // read commands to CPU02.
-void void apipc_ipc0_isr_handler(void)
+interrupt void apipc_ipc0_isr_handler(void)
 {
     tIpcMessage sMessage;
 
@@ -298,10 +405,9 @@ void void apipc_ipc0_isr_handler(void)
 //
 // RtoLIPC1IntHandler - Handles Data Block Reads/Writes
 // 
-void apipc_ipc1_isr_handler(void)
+interrupt void apipc_ipc1_isr_handler(void)
 {
     tIpcMessage sMessage;
-
     //
     // Continue proccessing messages as long as GetBuffer2 is full
     //
@@ -309,13 +415,14 @@ void apipc_ipc1_isr_handler(void)
     {
         switch(sMessage.ulcommand) 
         {
+            case IPC_BLOCK_READ:
+                IPCRtoLBlockRead(&sMessage);
+                break;
 
             case IPC_BLOCK_WRITE:
                 IPCRtoLBlockWrite(&sMessage);
                 break;
-            case IPC_BLOCK_READ:
-                IPCRtoLBlockRead(&sMessage);
-                break;
+
             default:
                 break;
         }
