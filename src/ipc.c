@@ -117,6 +117,10 @@ static void apipc_init_objs(void)
  /* apipc_init: Initialize ipc API  */
 void apipc_init(void)
 {
+
+    /* Initialize peripheral IPC device to a known state */
+    InitIpc();
+
     /* Initializes System IPC driver controller */
     IPCInitialize(&g_sIpcController1, IPC_INT0, IPC_INT0);
     IPCInitialize(&g_sIpcController2, IPC_INT1, IPC_INT1);
