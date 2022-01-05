@@ -64,14 +64,6 @@ enum apipc_rc
     APIPC_RC_SUCCESS = 0
 };
 
-enum apipc_addr_ind
-{
-    APIPC_RADDR_CONFIG = 0,
-    APIPC_RADDR_VARS,
-    APIPC_RADDR_VARS_RATED,
-    APIPC_RADDR_TOTAL,
-};
-
 enum apipc_flags
 {
     APIPC_FLAG_API_INITED = IPC_FLAG4, /* Local API implementation is inited */
