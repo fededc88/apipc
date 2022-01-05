@@ -180,6 +180,8 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
     struct apipc_obj *plobj;
     struct apipc_obj *probj;
 
+    uint32_t ulData;
+
 
     rc = APIPC_RC_SUCCESS;
     plobj = &l_apipc_obj[obj_idx];
@@ -219,7 +221,13 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
 
         case APIPC_OBJ_TYPE_DATA:
 
-            if(plobj->len > 2)
+            if(plobj->len == IPC_LENGTH_16_BITS)
+                ulData = (uint32_t) *(uint16_t *)plobj->paddr;
+
+            else if(plobj->len > IPC_LENGTH_32_BITS)
+                ulData = (uint32_t) *(uint32_t *)plobj->paddr;
+
+            else
             {
                 rc = APIPC_RC_FAIL;
                 break;
@@ -227,8 +235,7 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
 
             if(STATUS_FAIL == IPCLtoRDataWrite(&g_sIpcController2,
                                                (uint32_t)probj->paddr,
-                                               (uint32_t) *(uint32_t *)plobj->paddr,
-                                               (uint16_t)plobj->len,
+                                               ulData, (uint16_t)plobj->len,
                                                DISABLE_BLOCKING, NO_FLAG))
             {
                 rc = APIPC_RC_FAIL;
