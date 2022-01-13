@@ -173,6 +173,42 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
     return rc;
 }
 
+enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask)
+{
+
+    enum apipc_rc rc;
+    struct apipc_obj *plobj;
+    struct apipc_obj *probj;
+
+    rc = APIPC_RC_SUCCESS;
+    plobj = &l_apipc_obj[obj_idx];
+    probj = &r_apipc_obj[obj_idx];
+
+    if(STATUS_FAIL == IPCLtoRSetBits(&g_sIpcController2, (uint32_t)probj->paddr, bmask, (uint16_t)plobj->len,
+                DISABLE_BLOCKING))
+        rc = APIPC_RC_FAIL;
+
+    return rc;
+}
+
+enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
+{
+
+    enum apipc_rc rc;
+    struct apipc_obj *plobj;
+    struct apipc_obj *probj;
+
+    rc = APIPC_RC_SUCCESS;
+    plobj = &l_apipc_obj[obj_idx];
+    probj = &r_apipc_obj[obj_idx];
+
+    if(STATUS_FAIL == IPCLtoRClearBits(&g_sIpcController2, (uint32_t)probj->paddr, bmask, (uint16_t)plobj->len,
+                DISABLE_BLOCKING))
+        rc = APIPC_RC_FAIL;
+
+    return rc;
+}
+
 //
 // Write Memory Block through GSRAM  
 //
@@ -185,7 +221,7 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
     struct apipc_obj *probj;
 
     uint32_t ulData;
-
+    uint32_t ulMask;
 
     rc = APIPC_RC_SUCCESS;
     plobj = &l_apipc_obj[obj_idx];
@@ -202,7 +238,8 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
             /* Allocates spaces for a block on the statically reserved mem space */
             plobj->pGSxM = (uint16_t *) mymalloc(l_r_w_data_h, plobj->len);
 
-            if(plobj->pGSxM == NULL){
+            if(plobj->pGSxM == NULL)
+            {
                 rc = APIPC_RC_FAIL;
                 break; 
             }
@@ -241,9 +278,23 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
                                                (uint32_t)probj->paddr,
                                                ulData, (uint16_t)plobj->len,
                                                DISABLE_BLOCKING, NO_FLAG))
-            {
                 rc = APIPC_RC_FAIL;
-            }
+            break;
+
+        case APIPC_OBJ_TYPE_FLAGS:
+
+            if(plobj->len == IPC_LENGTH_16_BITS)
+                ulMask = (uint32_t) *(uint16_t *)plobj->paddr;
+
+            else if(plobj->len > IPC_LENGTH_32_BITS)
+                ulMask = (uint32_t) *(uint32_t *)plobj->paddr;
+
+            if( APIPC_RC_FAIL == apipc_flags_set_bits(plobj->idx, ulMask))
+                rc = APIPC_RC_FAIL;
+
+            if( APIPC_RC_FAIL == apipc_flags_clear_bits(plobj->idx, ~ulMask))
+                rc = APIPC_RC_FAIL;
+
             break;
 
         default:
@@ -456,6 +507,14 @@ interrupt void apipc_ipc1_isr_handler(void)
 
             case IPC_BLOCK_WRITE:
                 IPCRtoLBlockWrite(&sMessage);
+                break;
+
+            case IPC_SET_BITS:
+                IPCRtoLSetBits(&sMessage);
+                break;
+
+            case IPC_CLEAR_BITS:
+                IPCRtoLClearBits(&sMessage);
                 break;
 
             default:

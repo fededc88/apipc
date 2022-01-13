@@ -33,6 +33,21 @@ void apipc_init(void);
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup);
 
+
+/**
+ * @fn apipc_flags_set_bits
+ *
+ * @brief 
+ */
+enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask);
+
+/**
+ * @fn apipc_flags_clear_bits
+ *
+ * @brief 
+ */
+enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask);
+
 /**
  * @fn apipc_send
  *
