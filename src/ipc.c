@@ -42,6 +42,7 @@ mymalloc_handler l_r_w_data_h;
 static void apipc_sram_acces_config(void);
 static void apipc_check_remote_cpu_init(void);
 static void apipc_init_objs(void);
+static void apipc_proc_obj(struct apipc_obj *plobj);
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -142,11 +143,7 @@ void apipc_init(void)
     apipc_check_remote_cpu_init();
 }
 
-/**
- * GSxM_register_l_r_w_addr()
- */
-//TODO: desarrollar una funcion que me permita registar la dirección de una
-//variable en el lugar correspondiente segund estructura
+/* apipc_register_obj: register an obj parameters to be able to tranfer */
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup)
 {
@@ -172,7 +169,7 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
 
     return rc;
 }
-
+/* apipc_flags_set_bits: Sets the designated bits at the remote CPU obj */
 enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask)
 {
 
@@ -191,6 +188,7 @@ enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask)
     return rc;
 }
 
+/* apipc_flags_set_bits: Clear the designated bits at the remote CPU obj */
 enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
 {
 
@@ -209,10 +207,7 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
     return rc;
 }
 
-//
-// Write Memory Block through GSRAM  
-//
-// NOTE: This is an experimental test
+/* apipc_send: */
 enum apipc_rc apipc_send(uint16_t obj_idx)
 {
     enum apipc_rc rc;
@@ -304,65 +299,8 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
     return rc;
 }
 
-#if defined( CPU1 )
-
-enum apipc_rc apipc_startup_config(void)
+static void apipc_proc_obj(struct apipc_obj *plobj)
 {
-    static enum apipc_rc rc;
-    static enum apipc_startup_sm apipc_startup_sm = APIPC_SU_SM_UNKNOWN;
-    static struct apipc_obj *plobj;
-
-    static uint16_t obj_idx;
-    static uint16_t startup_finished = 0;
-
-
-    switch(apipc_startup_sm)
-    {
-        case APIPC_SU_SM_UNKNOWN:
-            apipc_startup_sm = APIPC_SU_SM_INIT;
-
-        case APIPC_SU_SM_INIT:
-
-            rc = APIPC_RC_FAIL;
-            startup_finished = 1;
-            plobj = l_apipc_obj;
-            obj_idx = 0;
-            apipc_startup_sm = APIPC_SU_SM_STARTING;
-            break;
-
-        case APIPC_SU_SM_STARTING:
-
-            apipc_proc_obj(plobj);
-
-            if(plobj->obj_sm != APIPC_OBJ_SM_UNKNOWN && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
-                startup_finished = 0;
-
-            plobj++;
-            obj_idx++;
-
-            if(obj_idx >= APIPC_MAX_OBJ)
-            {
-                if(startup_finished)
-                    apipc_startup_sm = APIPC_SU_SM_FINISHED;
-                else
-                    apipc_startup_sm = APIPC_SU_SM_INIT;
-            }
-            break;
-
-        case APIPC_SU_SM_FINISHED:
-            rc = APIPC_RC_SUCCESS;
-            break;
-
-    }
-
-    return rc;
-}
-
-
-void apipc_proc_obj(struct apipc_obj *plobj)
-{
-    static enum apipc_rc rc;
-
     switch(plobj->obj_sm)
     {
         case APIPC_OBJ_SM_UNKNOWN:
@@ -423,6 +361,61 @@ void apipc_proc_obj(struct apipc_obj *plobj)
             break;
     }
 }
+
+#if defined( CPU1 )
+
+enum apipc_rc apipc_startup_config(void)
+{
+    static enum apipc_rc rc;
+    static enum apipc_startup_sm apipc_startup_sm = APIPC_SU_SM_UNKNOWN;
+    static struct apipc_obj *plobj;
+
+    static uint16_t obj_idx;
+    static uint16_t startup_finished = 0;
+
+
+    switch(apipc_startup_sm)
+    {
+        case APIPC_SU_SM_UNKNOWN:
+            apipc_startup_sm = APIPC_SU_SM_INIT;
+
+        case APIPC_SU_SM_INIT:
+
+            rc = APIPC_RC_FAIL;
+            startup_finished = 1;
+            plobj = l_apipc_obj;
+            obj_idx = 0;
+            apipc_startup_sm = APIPC_SU_SM_STARTING;
+            break;
+
+        case APIPC_SU_SM_STARTING:
+
+            apipc_proc_obj(plobj);
+
+            if(plobj->obj_sm != APIPC_OBJ_SM_UNKNOWN && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
+                startup_finished = 0;
+
+            plobj++;
+            obj_idx++;
+
+            if(obj_idx >= APIPC_MAX_OBJ)
+            {
+                if(startup_finished)
+                    apipc_startup_sm = APIPC_SU_SM_FINISHED;
+                else
+                    apipc_startup_sm = APIPC_SU_SM_INIT;
+            }
+            break;
+
+        case APIPC_SU_SM_FINISHED:
+            rc = APIPC_RC_SUCCESS;
+            break;
+
+    }
+
+    return rc;
+}
+
 
 void apipc_app(void)
 {

@@ -21,7 +21,7 @@ extern volatile tIpcController g_sIpcController2;
 /**
  * @fn ipc_init
  *
- * @brief Initialize IPC API
+ * @brief Initialize apipc IPC API
  */
 void apipc_init(void);
 
@@ -37,14 +37,14 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
 /**
  * @fn apipc_flags_set_bits
  *
- * @brief 
+ * @brief Sets the designated bits at the remote obj.
  */
 enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask);
 
 /**
  * @fn apipc_flags_clear_bits
  *
- * @brief 
+ * @brief Clear the designated bits at the remote obj.
  */
 enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask);
 
@@ -61,8 +61,6 @@ enum apipc_rc apipc_send(uint16_t obj_idx);
  * @brief Start a comunication over IPC API 
  */
 enum apipc_rc apipc_startup_config(void);
-
-void apipc_proc_obj(struct apipc_obj *plobj);
 
 /**
  * @fn apipc_app
