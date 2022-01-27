@@ -43,6 +43,8 @@ static void apipc_sram_acces_config(void);
 static void apipc_check_remote_cpu_init(void);
 static void apipc_init_objs(void);
 static void apipc_proc_obj(struct apipc_obj *plobj);
+static void apipc_cmd_response (tIpcMessage *psMessage);
+static void apipc_message_handler (tIpcMessage *psMessage);
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -305,7 +307,10 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
     {
         case APIPC_OBJ_SM_UNKNOWN:
             if(plobj->paddr == NULL)
+            {
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
                 break;
+            }
 
         case APIPC_OBJ_SM_INIT:
             if(plobj->flag.startup)
@@ -332,17 +337,37 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                 plobj->obj_sm = APIPC_OBJ_SM_RETRY;
             }
             else
-                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+            {
+                if(plobj->pGSxM)
+                {
+                    myfree(l_r_w_data_h, plobj->pGSxM);
+                    plobj->pGSxM = NULL;
+                }
 
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+                plobj->flag.error = 1;
+            }
             break;
 
         case APIPC_OBJ_SM_WAITTING_RESPONSE:
 
             if(ipc_timer_expired(plobj->timer, IPC_TIMER_WAIT_5mS))
             {
-                myfree(l_r_w_data_h, plobj->pGSxM);
-                plobj->pGSxM = NULL;
+                if (plobj->retry)
+                {
+                    plobj->timer = ipc_read_timer();
+                    plobj->retry--;
+                    plobj->obj_sm = APIPC_OBJ_SM_RETRY;
+                    break;
+                }
+
+                if(plobj->pGSxM)
+                {
+                    myfree(l_r_w_data_h, plobj->pGSxM);
+                    plobj->pGSxM = NULL;
+                }
                 plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+                plobj->flag.error = 1;
             }
             break;
 
@@ -358,6 +383,107 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
             break;
 
         case APIPC_OBJ_SM_IDLE:
+            break;
+    }
+}
+
+
+static void apipc_cmd_response (tIpcMessage *psMessage)
+{
+
+    enum apipc_msg_cmd cmd_response;
+     uint16_t *urAddess = NULL;
+     uint32_t ulDataW1 = 0;
+     uint32_t ulDataW2 = 0;
+
+    cmd_response = (enum apipc_msg_cmd) psMessage->ulcommand;
+
+    switch(cmd_response)
+    {
+        case APIPC_MSG_CMD_SET_BITS_RSP:
+        case APIPC_MSG_CMD_CLEAR_BITS_RSP:
+        case APIPC_MSG_CMD_DATA_WRITE_RSP:
+            urAddess = (uint16_t *) psMessage->uladdress;
+            ulDataW1 = (uint32_t) cmd_response;
+            break;
+
+        case APIPC_MSG_CMD_BLOCK_READ_RSP:
+            return;
+
+        case APIPC_MSG_CMD_BLOCK_WRITE_RSP:
+            urAddess = (uint16_t *) psMessage->uladdress;
+            ulDataW1 = (uint32_t) cmd_response;
+            break;
+
+        case APIPC_MSG_CMD_DATA_READ_PROTECTED_RSP:
+        case APIPC_MSG_CMD_SET_BITS_PROTECTED_RSP:
+        case APIPC_MSG_CMD_CLEAR_BITS_PROTECTED_RSP:
+        case APIPC_MSG_CMD_DATA_WRITE_PROTECTED_RSP:
+        case APIPC_MSG_CMD_BLOCK_WRITE_PROTECTED_RSP:
+            return;
+    }
+
+    IPCLtoRSendMessage(&g_sIpcController2,(uint32_t) APIPC_MESSAGE,
+            (uint32_t) urAddess, ulDataW1, ulDataW2, DISABLE_BLOCKING);
+}
+
+static void apipc_message_handler (tIpcMessage *psMessage)
+{
+    enum apipc_msg_cmd ulCommand;
+
+    uint16_t obj_idx = 0;
+    uint16_t *pusRAddress;
+
+    struct apipc_obj *plobj;
+    struct apipc_obj *probj;
+
+    plobj = &l_apipc_obj[obj_idx];
+    probj = &r_apipc_obj[obj_idx];
+
+    pusRAddress = (uint16_t *) psMessage->uladdress;
+    ulCommand = (enum apipc_msg_cmd) psMessage->uldataw1;
+
+    /* search the obj_idx corresponding to the response */
+    for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; plobj++, probj++, obj_idx++)
+        if(pusRAddress == probj->paddr)
+            break;
+
+    switch(ulCommand)
+    {
+
+        case APIPC_MSG_CMD_SET_BITS_RSP:
+        case APIPC_MSG_CMD_CLEAR_BITS_RSP:
+        case APIPC_MSG_CMD_DATA_WRITE_RSP:
+        case APIPC_MSG_CMD_BLOCK_READ_RSP:
+            break;
+
+        case APIPC_MSG_CMD_BLOCK_WRITE_RSP:
+            if(plobj->pGSxM)
+            {
+                myfree(l_r_w_data_h, plobj->pGSxM);
+                plobj->pGSxM = NULL;
+            }
+            break;
+
+        case APIPC_MSG_CMD_DATA_READ_PROTECTED_RSP:
+        case APIPC_MSG_CMD_SET_BITS_PROTECTED_RSP:
+        case APIPC_MSG_CMD_CLEAR_BITS_PROTECTED_RSP:
+        case APIPC_MSG_CMD_DATA_WRITE_PROTECTED_RSP:
+        case APIPC_MSG_CMD_BLOCK_WRITE_PROTECTED_RSP:
+            break;
+    }
+    
+    switch (plobj->obj_sm)
+    {
+        case APIPC_OBJ_SM_STARTED:
+            break;
+
+        case APIPC_OBJ_SM_WAITTING_RESPONSE:
+            plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+            break;
+
+        default:
+            plobj->obj_sm = APIPC_OBJ_SM_UNKNOWN;
             break;
     }
 }
@@ -392,7 +518,7 @@ enum apipc_rc apipc_startup_config(void)
 
             apipc_proc_obj(plobj);
 
-            if(plobj->obj_sm != APIPC_OBJ_SM_UNKNOWN && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
+            if(plobj->obj_sm != APIPC_OBJ_SM_IDLE && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
                 startup_finished = 0;
 
             plobj++;
@@ -415,7 +541,6 @@ enum apipc_rc apipc_startup_config(void)
 
     return rc;
 }
-
 
 void apipc_app(void)
 {
@@ -492,22 +617,31 @@ interrupt void apipc_ipc1_isr_handler(void)
         {
             case IPC_DATA_WRITE:
                 IPCRtoLDataWrite(&sMessage);
+                apipc_cmd_response (&sMessage);
                 break;
 
             case IPC_BLOCK_READ:
                 IPCRtoLBlockRead(&sMessage);
+                apipc_cmd_response (&sMessage);
                 break;
 
             case IPC_BLOCK_WRITE:
                 IPCRtoLBlockWrite(&sMessage);
+                apipc_cmd_response (&sMessage);
                 break;
 
             case IPC_SET_BITS:
                 IPCRtoLSetBits(&sMessage);
+                apipc_cmd_response (&sMessage);
                 break;
 
             case IPC_CLEAR_BITS:
                 IPCRtoLClearBits(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case APIPC_MESSAGE:
+                apipc_message_handler(&sMessage);
                 break;
 
             default:

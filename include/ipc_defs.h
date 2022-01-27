@@ -27,6 +27,15 @@
 // Maximum number of object apipc can handle
 #define APIPC_MAX_OBJ 10
 
+/*
+ * The following values extends the IPC driver command values passed between
+ * processors in tIpcMessage.ulcommqnd register to determine what command is
+ * requested by the sending processor. 
+ * User should implement the corresponding function that serves the command on
+ * the remote CPU side to interpret and use the message.
+ */
+#define APIPC_MESSAGE 0x0001000C
+
 enum apipc_sm
 {
     APIPC_SM_UNKNOWN = 0,
@@ -58,6 +67,20 @@ enum apipc_obj_sm
     APIPC_OBJ_SM_STARTED,
 };
 
+enum apipc_msg_cmd
+{
+        APIPC_MSG_CMD_SET_BITS_RSP              = 0x00010001,
+        APIPC_MSG_CMD_CLEAR_BITS_RSP            = 0x00010002,
+        APIPC_MSG_CMD_DATA_WRITE_RSP            = 0x00010003,
+        APIPC_MSG_CMD_BLOCK_READ_RSP            = 0x00010004,
+        APIPC_MSG_CMD_BLOCK_WRITE_RSP           = 0x00010005,
+        APIPC_MSG_CMD_DATA_READ_PROTECTED_RSP   = 0x00010007,
+        APIPC_MSG_CMD_SET_BITS_PROTECTED_RSP    = 0x00010008,
+        APIPC_MSG_CMD_CLEAR_BITS_PROTECTED_RSP  = 0x00010009,
+        APIPC_MSG_CMD_DATA_WRITE_PROTECTED_RSP  = 0x0001000A,
+        APIPC_MSG_CMD_BLOCK_WRITE_PROTECTED_RSP = 0x0001000B,
+};
+
 enum apipc_rc
 {
     APIPC_RC_FAIL = -1,
@@ -85,7 +108,8 @@ enum apipc_obj_type
 struct apipc_obj_flag
 {
     uint16_t startup:1;
-    uint16_t spare:15;
+    uint16_t error:1;
+    uint16_t spare:14;
 };
 
 struct apipc_obj
