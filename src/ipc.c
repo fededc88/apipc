@@ -45,6 +45,8 @@ static void apipc_init_objs(void);
 static void apipc_proc_obj(struct apipc_obj *plobj);
 static void apipc_cmd_response (tIpcMessage *psMessage);
 static void apipc_message_handler (tIpcMessage *psMessage);
+static enum apipc_rc apipc_write(uint16_t obj_idx);
+
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -145,7 +147,8 @@ void apipc_init(void)
     apipc_check_remote_cpu_init();
 }
 
-/* apipc_register_obj: register an obj parameters to be able to tranfer */
+/* apipc_register_obj: register an obj parameters to be able to tranfer between
+ * cores */
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup)
 {
@@ -171,6 +174,25 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
 
     return rc;
 }
+
+/* apipc_send: request transfer an object on demand. Object should have been
+ * inited to APIPC_OBJ_SM_STARTED to function */
+enum apipc_rc apipc_send(uint16_t obj_idx)
+{
+    enum apipc_rc rc;
+    struct apipc_obj *plobj;
+
+    rc = APIPC_RC_SUCCESS;
+    plobj = &l_apipc_obj[obj_idx];
+
+    if(plobj->obj_sm == APIPC_OBJ_SM_STARTED)
+        plobj->obj_sm = APIPC_OBJ_SM_INIT;
+    else
+        rc = APIPC_RC_FAIL;
+
+    return rc;
+}
+
 /* apipc_flags_set_bits: Sets the designated bits at the remote CPU obj */
 enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask)
 {
@@ -209,8 +231,8 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
     return rc;
 }
 
-/* apipc_send: */
-enum apipc_rc apipc_send(uint16_t obj_idx)
+/* apipc_write: */
+static enum apipc_rc apipc_write(uint16_t obj_idx)
 {
     enum apipc_rc rc;
 
@@ -311,21 +333,19 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                 plobj->obj_sm = APIPC_OBJ_SM_IDLE;
                 break;
             }
+            if(!plobj->flag.startup)
+            {
+                plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+                break;
+            }
 
         case APIPC_OBJ_SM_INIT:
-            if(plobj->flag.startup)
-            {
                 plobj->retry = 3;
                 plobj->obj_sm = APIPC_OBJ_SM_WRITING;
-            }
-            else
-                plobj->obj_sm = APIPC_OBJ_SM_STARTED;
-            
-            break;
 
         case APIPC_OBJ_SM_WRITING:
 
-            if(apipc_send(plobj->idx) == APIPC_RC_SUCCESS)
+            if(apipc_write(plobj->idx) == APIPC_RC_SUCCESS)
             {
                 plobj->timer = ipc_read_timer();
                 plobj->obj_sm = APIPC_OBJ_SM_WAITTING_RESPONSE;
@@ -386,7 +406,6 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
             break;
     }
 }
-
 
 static void apipc_cmd_response (tIpcMessage *psMessage)
 {
@@ -488,7 +507,45 @@ static void apipc_message_handler (tIpcMessage *psMessage)
     }
 }
 
-#if defined( CPU1 )
+void apipc_app(void)
+{
+    static enum apipc_sm apipc_app_sm = APIPC_SM_UNKNOWN;
+
+    static struct apipc_obj *plobj;
+    static uint16_t obj_idx;
+
+    switch(apipc_app_sm)
+    {
+        case APIPC_SM_UNKNOWN:
+            if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
+            {
+                plobj = l_apipc_obj;
+                obj_idx = 0;
+                apipc_app_sm = APIPC_SM_STARTED;
+            }
+            break;
+
+        case APIPC_SM_IDLE:
+            break;
+
+        case APIPC_SM_STARTUP_REMOTE_CONFIG:
+            if(!apipc_startup_config())
+                apipc_app_sm = APIPC_SM_STARTED;
+            break;
+
+        case APIPC_SM_STARTED:
+            apipc_proc_obj(plobj++);
+
+            if(++obj_idx >= APIPC_MAX_OBJ)
+            {
+                plobj = l_apipc_obj;
+                obj_idx = 0;
+            }
+
+            break;
+    }
+
+}
 
 enum apipc_rc apipc_startup_config(void)
 {
@@ -542,30 +599,7 @@ enum apipc_rc apipc_startup_config(void)
     return rc;
 }
 
-void apipc_app(void)
-{
-    static enum apipc_sm apipc_app_sm = APIPC_SM_UNKNOWN;
-
-    switch(apipc_app_sm)
-    {
-        case APIPC_SM_UNKNOWN:
-            if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
-                apipc_app_sm = APIPC_SM_STARTUP_REMOTE_CONFIG;
-            break;
-
-        case APIPC_SM_IDLE:
-            break;
-
-        case APIPC_SM_STARTUP_REMOTE_CONFIG:
-            if(!apipc_startup_config())
-                apipc_app_sm = APIPC_SM_STARTED;
-            break;
-
-        case APIPC_SM_STARTED:
-            break;
-    }
-
-}
+#if defined( CPU1 )
 
 #elif defined(CPU2)
 

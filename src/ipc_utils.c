@@ -45,35 +45,6 @@
     return (to);
 }
 
-#if defined(CPU1)
-
-/**
- * GSxM_Acces() - Master CPU Configures master R/W/Exe Access to Shared SARAM
- */
-void GSxM_Acces(uint32_t ulMask, uint16_t usMaster)
-{
-
-    if ( usMaster == IPC_GSX_CPU2_MASTER )
-    {
-	while ((MemCfgRegs.GSxMSEL.all & ulMask) != ulMask) 
-	{
-	    EALLOW;
-	    MemCfgRegs.GSxMSEL.all |= ulMask;
-	    EDIS;
-	}
-    }
-    else if ( usMaster == IPC_GSX_CPU1_MASTER )
-    {
-
-	while ((MemCfgRegs.GSxMSEL.all & ulMask) != 0) 
-	{
-	    EALLOW;
-	    MemCfgRegs.GSxMSEL.all &= ~(ulMask);
-	    EDIS;
-	}
-    }
-}
-
 /*
  * ipc_read_timer - Read the current IPC timer value. 
  */
@@ -111,6 +82,35 @@ uint16_t ipc_timer_expired(uint64_t start, uint64_t wait)
     else 
         return 0;
 
+}
+
+#if defined(CPU1)
+
+/**
+ * GSxM_Acces() - Master CPU Configures master R/W/Exe Access to Shared SARAM
+ */
+void GSxM_Acces(uint32_t ulMask, uint16_t usMaster)
+{
+
+    if ( usMaster == IPC_GSX_CPU2_MASTER )
+    {
+	while ((MemCfgRegs.GSxMSEL.all & ulMask) != ulMask) 
+	{
+	    EALLOW;
+	    MemCfgRegs.GSxMSEL.all |= ulMask;
+	    EDIS;
+	}
+    }
+    else if ( usMaster == IPC_GSX_CPU1_MASTER )
+    {
+
+	while ((MemCfgRegs.GSxMSEL.all & ulMask) != 0) 
+	{
+	    EALLOW;
+	    MemCfgRegs.GSxMSEL.all &= ~(ulMask);
+	    EDIS;
+	}
+    }
 }
 
 #endif

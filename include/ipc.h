@@ -33,6 +33,13 @@ void apipc_init(void);
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup);
 
+/**
+ * @fn apipc_send
+ *
+ * @brief start the transfer of an object on demand. Object should have been
+ * inited to APIPC_OBJ_SM_STARTED 
+ */
+enum apipc_rc apipc_send(uint16_t obj_idx);
 
 /**
  * @fn apipc_flags_set_bits
@@ -48,12 +55,6 @@ enum apipc_rc apipc_flags_set_bits(uint16_t obj_idx, uint32_t bmask);
  */
 enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask);
 
-/**
- * @fn apipc_send
- *
- * @brief Start a comunication over IPC API 
- */
-enum apipc_rc apipc_send(uint16_t obj_idx);
 
 /**
  * @fn apipc_startup_config
