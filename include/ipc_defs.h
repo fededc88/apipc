@@ -69,16 +69,18 @@ enum apipc_obj_sm
 
 enum apipc_msg_cmd
 {
-        APIPC_MSG_CMD_SET_BITS_RSP              = 0x00010001,
-        APIPC_MSG_CMD_CLEAR_BITS_RSP            = 0x00010002,
-        APIPC_MSG_CMD_DATA_WRITE_RSP            = 0x00010003,
-        APIPC_MSG_CMD_BLOCK_READ_RSP            = 0x00010004,
-        APIPC_MSG_CMD_BLOCK_WRITE_RSP           = 0x00010005,
-        APIPC_MSG_CMD_DATA_READ_PROTECTED_RSP   = 0x00010007,
-        APIPC_MSG_CMD_SET_BITS_PROTECTED_RSP    = 0x00010008,
-        APIPC_MSG_CMD_CLEAR_BITS_PROTECTED_RSP  = 0x00010009,
-        APIPC_MSG_CMD_DATA_WRITE_PROTECTED_RSP  = 0x0001000A,
-        APIPC_MSG_CMD_BLOCK_WRITE_PROTECTED_RSP = 0x0001000B,
+    APIPC_MSG_CMD_FUNC_CALL_RSP             = 0x00000012,
+
+    APIPC_MSG_CMD_SET_BITS_RSP              = 0x00010001,
+    APIPC_MSG_CMD_CLEAR_BITS_RSP            = 0x00010002,
+    APIPC_MSG_CMD_DATA_WRITE_RSP            = 0x00010003,
+    APIPC_MSG_CMD_BLOCK_READ_RSP            = 0x00010004,
+    APIPC_MSG_CMD_BLOCK_WRITE_RSP           = 0x00010005,
+    APIPC_MSG_CMD_DATA_READ_PROTECTED_RSP   = 0x00010007,
+    APIPC_MSG_CMD_SET_BITS_PROTECTED_RSP    = 0x00010008,
+    APIPC_MSG_CMD_CLEAR_BITS_PROTECTED_RSP  = 0x00010009,
+    APIPC_MSG_CMD_DATA_WRITE_PROTECTED_RSP  = 0x0001000A,
+    APIPC_MSG_CMD_BLOCK_WRITE_PROTECTED_RSP = 0x0001000B,
 };
 
 enum apipc_rc
@@ -99,10 +101,11 @@ enum apipc_flags
 
 enum apipc_obj_type
 { 
-    APIPC_OBJ_TYPE_ND = 0,
-    APIPC_OBJ_TYPE_BLOCK = 1,
-    APIPC_OBJ_TYPE_DATA = 2,
-    APIPC_OBJ_TYPE_FLAGS = 3,
+    APIPC_OBJ_TYPE_ND      = 0,
+    APIPC_OBJ_TYPE_BLOCK   = 1,
+    APIPC_OBJ_TYPE_DATA    = 2,
+    APIPC_OBJ_TYPE_FLAGS   = 3,
+    APIPC_OBJ_TYPE_FUNC_CALL = 4,
 };
 
 struct apipc_obj_flag
@@ -118,6 +121,7 @@ struct apipc_obj
     enum apipc_obj_type type;
     enum apipc_obj_sm obj_sm;
     void *paddr;
+    uint32_t payload; // for func_call use to transfer de argument
     size_t len;
     uint16_t *pGSxM;
     uint64_t timer;

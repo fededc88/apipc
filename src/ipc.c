@@ -47,7 +47,6 @@ static void apipc_cmd_response (tIpcMessage *psMessage);
 static void apipc_message_handler (tIpcMessage *psMessage);
 static enum apipc_rc apipc_write(uint16_t obj_idx);
 
-
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
 {
@@ -316,6 +315,16 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
 
             break;
 
+        case APIPC_OBJ_TYPE_FUNC_CALL:
+
+            ulData = (uint32_t) plobj->payload;
+
+            if(STATUS_FAIL == IPCLtoRFunctionCall(&g_sIpcController2,
+                                               (uint32_t)probj->paddr, ulData,
+                                               DISABLE_BLOCKING))
+                rc = APIPC_RC_FAIL;
+            break;
+
         default:
             break;
     }
@@ -419,6 +428,7 @@ static void apipc_cmd_response (tIpcMessage *psMessage)
 
     switch(cmd_response)
     {
+        case APIPC_MSG_CMD_FUNC_CALL_RSP:
         case APIPC_MSG_CMD_SET_BITS_RSP:
         case APIPC_MSG_CMD_CLEAR_BITS_RSP:
         case APIPC_MSG_CMD_DATA_WRITE_RSP:
@@ -469,6 +479,8 @@ static void apipc_message_handler (tIpcMessage *psMessage)
 
     switch(ulCommand)
     {
+        case APIPC_MSG_CMD_FUNC_CALL_RSP:
+            break;
 
         case APIPC_MSG_CMD_SET_BITS_RSP:
         case APIPC_MSG_CMD_CLEAR_BITS_RSP:
@@ -649,6 +661,12 @@ interrupt void apipc_ipc1_isr_handler(void)
     {
         switch(sMessage.ulcommand) 
         {
+
+            case IPC_FUNC_CALL:
+                IPCRtoLFunctionCall(&sMessage);
+                apipc_cmd_response(&sMessage);
+                break;
+
             case IPC_DATA_WRITE:
                 IPCRtoLDataWrite(&sMessage);
                 apipc_cmd_response (&sMessage);
