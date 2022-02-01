@@ -113,7 +113,7 @@ static void apipc_init_objs(void)
 
     plobj = l_apipc_obj;
 
-    for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++)
+    for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++, plobj++)
         plobj->paddr = NULL;
 }
 
