@@ -274,7 +274,6 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
                 myfree(l_r_w_data_h, plobj->pGSxM);
                 plobj->pGSxM = NULL;
                 rc = APIPC_RC_FAIL;
-                break;
             }
             break;
 
@@ -382,18 +381,18 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
 
             if(ipc_timer_expired(plobj->timer, IPC_TIMER_WAIT_5mS))
             {
+                if(plobj->pGSxM)
+                {
+                    myfree(l_r_w_data_h, plobj->pGSxM);
+                    plobj->pGSxM = NULL;
+                }
+
                 if (plobj->retry)
                 {
                     plobj->timer = ipc_read_timer();
                     plobj->retry--;
                     plobj->obj_sm = APIPC_OBJ_SM_RETRY;
                     break;
-                }
-
-                if(plobj->pGSxM)
-                {
-                    myfree(l_r_w_data_h, plobj->pGSxM);
-                    plobj->pGSxM = NULL;
                 }
                 plobj->obj_sm = APIPC_OBJ_SM_IDLE;
                 plobj->flag.error = 1;
@@ -412,6 +411,8 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
             break;
 
         case APIPC_OBJ_SM_IDLE:
+     //       if(!plobj->flag.startup)
+     //           plobj->obj_sm = APIPC_OBJ_SM_STARTED;
             break;
     }
 }
