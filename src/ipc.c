@@ -18,6 +18,7 @@
 
 #include "ipc.h"
 #include "../lib/mymalloc/mymalloc.h"
+#include "../lib/circular_buffer/buffer.h"
 
 /* ipclib shared buffers space allocation */
 // NOTE: space is allocated depending on the .cmd file included in the project
@@ -38,6 +39,11 @@ volatile tIpcController g_sIpcController2;
 /* mymalloc API handler declaration. */
 mymalloc_handler l_r_w_data_h;
 
+/* circular_buffer handler declaration. */
+circular_buffer_handler message_cbh;
+/* ipc mesasages array memory allocation */
+tIpcMessage message_array[APIPC_MAX_OBJ];
+
 /* statics functions prototipes declarations */
 static void apipc_sram_acces_config(void);
 static void apipc_check_remote_cpu_init(void);
@@ -46,6 +52,7 @@ static void apipc_proc_obj(struct apipc_obj *plobj);
 static void apipc_cmd_response (tIpcMessage *psMessage);
 static void apipc_message_handler (tIpcMessage *psMessage);
 static enum apipc_rc apipc_write(uint16_t obj_idx);
+static enum apipc_rc apipc_process_messages(void);
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -134,6 +141,10 @@ void apipc_init(void)
 
     /* Initialize mymalloc handler to allocate cl_r_w_data data dynamically */
     l_r_w_data_h = mymalloc_init_array((void*)cl_r_w_data, (size_t)CL_R_W_DATA_LENGTH);
+
+    /* Initialize circular_buffer  handler to manage an array of tIpcMessage dynamically */
+    message_cbh = circular_buffer_init((void *)&message_array, sizeof(tIpcMessage),
+                                  (uint16_t)APIPC_MAX_OBJ);
 
     /* initialize the objs array to a known state */
     apipc_init_objs();
@@ -547,6 +558,7 @@ void apipc_app(void)
             break;
 
         case APIPC_SM_STARTED:
+            apipc_process_messages();
             apipc_proc_obj(plobj++);
 
             if(++obj_idx >= APIPC_MAX_OBJ)
@@ -656,13 +668,30 @@ interrupt void apipc_ipc1_isr_handler(void)
 {
     tIpcMessage sMessage;
     //
-    // Continue proccessing messages as long as GetBuffer2 is full
+    // Get messages from driver as long as GetBuffer2 is full and store on the
+    // apipc circullar buffer to be processed
     //
     while(IpcGet(&g_sIpcController2, &sMessage, DISABLE_BLOCKING)!= STATUS_FAIL)
+        circular_buffer_put(message_cbh, (void *)&sMessage);
+
+    /* Acknowledge IC INT1 Flag */
+    IpcRegs.IPCACK.bit.IPC1 = 1;
+    
+    /* acknowledge the PIE group interrupt. */
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
+
+static enum apipc_rc apipc_process_messages(void)
+{
+    enum apipc_rc rc;
+    tIpcMessage sMessage;
+
+    rc = APIPC_RC_SUCCESS;
+
+    if(!circular_buffer_pop(message_cbh, (void *)&sMessage))
     {
         switch(sMessage.ulcommand) 
         {
-
             case IPC_FUNC_CALL:
                 IPCRtoLFunctionCall(&sMessage);
                 apipc_cmd_response(&sMessage);
@@ -698,15 +727,11 @@ interrupt void apipc_ipc1_isr_handler(void)
                 break;
 
             default:
+                rc = APIPC_RC_FAIL;
                 break;
         }
     }
-
-    /* Acknowledge IC INT1 Flag */
-    IpcRegs.IPCACK.bit.IPC1 = 1;
-    
-    /* acknowledge the PIE group interrupt. */
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+    return rc;
 }
 
 //
