@@ -5,6 +5,27 @@
 /*
  * Defines
  */
+
+/*
+ * The ramfunc attribute specifies that a function will be placed in and
+ * executed from RAM. The ramfunc // attribute allows the compiler to
+ * optimize functions for RAM execution.
+ * Use example:
+ *		__attribute__((ramfunc))
+ *		void f(void) {
+ *		...
+ *		}
+ */
+#if defined(_FLASH)
+#ifndef ram_func
+#if __TI_COMPILER_VERSION__ >= 16006000
+#define ram_func __attribute__((ramfunc))
+#else
+#define ram_func 
+#endif
+#endif
+#endif
+
 // gsxm blocks that master cpu1 reserverd for ipc driver app
 #define APIPC_CPU01_TO_CPU02_GSxRAM GS3_ACCESS|GS4_ACCESS|GS5_ACCESS
 // gsxm blocks that master cpu2 reserverd for ipc driver app
