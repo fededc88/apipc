@@ -4,3 +4,4 @@
 [submodule "lib/circular_buffer"]
 	path = lib/circular_buffer
 	url = git@github.com:fededc88/circular_buffer.git
+	branch = main
