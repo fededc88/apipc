@@ -80,12 +80,13 @@ enum apipc_startup_sm
 enum apipc_obj_sm
 {
     APIPC_OBJ_SM_UNKNOWN = 0,
+    APIPC_OBJ_SM_FREE,
     APIPC_OBJ_SM_INIT,
-    APIPC_OBJ_SM_IDLE,
     APIPC_OBJ_SM_WRITING,
     APIPC_OBJ_SM_WAITTING_RESPONSE,
     APIPC_OBJ_SM_RETRY,
-    APIPC_OBJ_SM_STARTED,
+    APIPC_OBJ_SM_IDLE,
+    APIPC_OBJ_SM_FAIL,
 };
 
 enum apipc_msg_cmd

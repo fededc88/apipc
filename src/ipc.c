@@ -185,9 +185,19 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
     return rc;
 }
 
-/* apipc_send: request transfer an object on demand. Object should have been
- * inited to APIPC_OBJ_SM_STARTED to function */
-enum apipc_rc apipc_send(uint16_t obj_idx)
+/* apipc_obj_state: consult the actual state of the obj_idx object sm. */
+enum apipc_obj_sm apipc_obj_state(uint16_t obj_idx)
+{
+    struct apipc_obj *plobj;
+
+    plobj = &l_apipc_obj[obj_idx];
+    return plobj->obj_sm;
+}
+
+
+/* apipc_send: request transfer an object on demand. object should have been
+ * inited to apipc_obj_sm_started to function */
+ram_func enum apipc_rc apipc_send(uint16_t obj_idx)
 {
     enum apipc_rc rc;
     struct apipc_obj *plobj;
@@ -195,7 +205,7 @@ enum apipc_rc apipc_send(uint16_t obj_idx)
     rc = APIPC_RC_SUCCESS;
     plobj = &l_apipc_obj[obj_idx];
 
-    if(plobj->obj_sm == APIPC_OBJ_SM_STARTED)
+    if(plobj->obj_sm == APIPC_OBJ_SM_IDLE)
         plobj->obj_sm = APIPC_OBJ_SM_INIT;
     else
         rc = APIPC_RC_FAIL;
@@ -349,12 +359,12 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
         case APIPC_OBJ_SM_UNKNOWN:
             if(plobj->paddr == NULL)
             {
-                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+                plobj->obj_sm = APIPC_OBJ_SM_FREE;
                 break;
             }
             if(!plobj->flag.startup)
             {
-                plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
                 break;
             }
 
@@ -383,7 +393,7 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                     plobj->pGSxM = NULL;
                 }
 
-                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+                plobj->obj_sm = APIPC_OBJ_SM_FAIL;
                 plobj->flag.error = 1;
             }
             break;
@@ -405,7 +415,7 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                     plobj->obj_sm = APIPC_OBJ_SM_RETRY;
                     break;
                 }
-                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
+                plobj->obj_sm = APIPC_OBJ_SM_FAIL;
                 plobj->flag.error = 1;
             }
             break;
@@ -418,12 +428,16 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
             }
             break;
 
-        case APIPC_OBJ_SM_STARTED:
+        case APIPC_OBJ_SM_FAIL:
+            if(!plobj->flag.startup)
+                plobj->obj_sm = APIPC_OBJ_SM_IDLE;
             break;
 
+            /* obj is started and idle ready to transmit */
         case APIPC_OBJ_SM_IDLE:
-     //       if(!plobj->flag.startup)
-     //           plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+            break;
+            /* obj is free, do nothing */
+        case APIPC_OBJ_SM_FREE:
             break;
     }
 }
@@ -518,11 +532,11 @@ static void apipc_message_handler (tIpcMessage *psMessage)
     
     switch (plobj->obj_sm)
     {
-        case APIPC_OBJ_SM_STARTED:
+        case APIPC_OBJ_SM_IDLE:
             break;
 
         case APIPC_OBJ_SM_WAITTING_RESPONSE:
-            plobj->obj_sm = APIPC_OBJ_SM_STARTED;
+            plobj->obj_sm = APIPC_OBJ_SM_IDLE;
             break;
 
         default:
@@ -600,7 +614,7 @@ enum apipc_rc apipc_startup_config(void)
 
             apipc_proc_obj(plobj);
 
-            if(plobj->obj_sm != APIPC_OBJ_SM_IDLE && plobj->obj_sm != APIPC_OBJ_SM_STARTED)
+            if(plobj->obj_sm != APIPC_OBJ_SM_FREE && plobj->obj_sm != APIPC_OBJ_SM_IDLE)
                 startup_finished = 0;
 
             plobj++;

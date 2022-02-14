@@ -34,6 +34,13 @@ enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup);
 
 /**
+ * @fn apipc_obj_state
+ *
+ * @brief consult the actual state of the obj_idx object sm 
+ */
+enum apipc_obj_sm apipc_obj_state(uint16_t obj_idx);
+
+/**
  * @fn apipc_send
  *
  * @brief start the transfer of an object on demand. Object should have been
