@@ -27,20 +27,21 @@
 #endif
 
 // gsxm blocks that master cpu1 reserverd for ipc driver app
-#define APIPC_CPU01_TO_CPU02_GSxRAM GS3_ACCESS|GS4_ACCESS|GS5_ACCESS
+#define APIPC_CPU01_TO_CPU02_GSxRAM GS4_ACCESS|GS5_ACCESS|GS6_ACCESS
 // gsxm blocks that master cpu2 reserverd for ipc driver app
-#define APIPC_CPU02_TO_CPU01_GSxRAM GS1_ACCESS|GS2_ACCESS|GS6_ACCESS
+#define APIPC_CPU02_TO_CPU01_GSxRAM GS2_ACCESS|GS3_ACCESS|GS7_ACCESS
 
-//GS3SARAM Start Address
-#define CPU01_TO_CPU02_R_W_DATA_START (uint32_t)0x0000F000  
+//GS4SARAM Start Address
+#define CPU01_TO_CPU02_R_W_DATA_START (uint32_t)0x00010000  
 
 // CPU01 to CPU02 Local Addresses MSG RAM off sets
-#define CPU01_TO_CPU02_R_W_ADDR (uint32_t)0x00011000  					              // for passing address
+#define CPU01_TO_CPU02_R_W_ADDR (uint32_t)0x00012000  					              // for passing address
 					
-#define CPU02_TO_CPU01_R_W_DATA_START (uint32_t)0x0000D000 
+//GS2SARAM Start Address
+#define CPU02_TO_CPU01_R_W_DATA_START (uint32_t)0x0000E000 
 
 // CPU02 to CPU01 Local Addresses MSG RAM offsets
-#define CPU02_TO_CPU01_R_W_ADDR (uint32_t)0x00012000  
+#define CPU02_TO_CPU01_R_W_ADDR (uint32_t)0x00013000  
 
 // Local R_W_DATA length space
 #define CL_R_W_DATA_LENGTH 4096

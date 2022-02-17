@@ -31,16 +31,16 @@ PAGE 1 : /* Data memory. This is a legacy description since the C28 has a unifie
 SECTIONS
 {
 
-   .cpul_cpur_data            : > RAMGS1,       PAGE = 1
+   .cpul_cpur_data            : > RAMGS2,       PAGE = 1
 
-   GROUP               : > RAMGS5,       PAGE = 1
-   {
-         .base_cpur_cpul_addr            /* allocate base_ramgs5 to RAMSG5_BASE specific address */
-         .cpur_cpul_addr               
-   }
    GROUP               : > RAMGS6,       PAGE = 1
    {
-         .base_cpul_cpur_addr            /* allocate base_ramgs6 to RAMSG6_BASE specific address */
+         .base_cpur_cpul_addr            /* allocate base_ramgs6 to RAMSG6_BASE specific address */
+         .cpur_cpul_addr               
+   }
+   GROUP               : > RAMGS7,       PAGE = 1
+   {
+         .base_cpul_cpur_addr            /* allocate base_ramgs7 to RAMSG7_BASE specific address */
          .cpul_cpur_addr              
    }
 
