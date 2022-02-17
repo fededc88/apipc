@@ -506,6 +506,7 @@ static void apipc_message_handler (tIpcMessage *psMessage)
     switch(ulCommand)
     {
         case APIPC_MSG_CMD_FUNC_CALL_RSP:
+        	pusRAddress = probj->paddr;
             break;
 
         case APIPC_MSG_CMD_SET_BITS_RSP:
@@ -550,89 +551,58 @@ void apipc_app(void)
     static enum apipc_sm apipc_app_sm = APIPC_SM_UNKNOWN;
 
     static struct apipc_obj *plobj;
-    static uint16_t obj_idx;
+    uint16_t obj_idx;
+
+    plobj = l_apipc_obj;
+
+    apipc_process_messages();
 
     switch(apipc_app_sm)
     {
         case APIPC_SM_UNKNOWN:
             if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
+#if defined( CPU2)
+                if(IPCRtoLFlagBusy(APIPC_FLAG_APP_START))
+#endif
+                    apipc_app_sm = APIPC_SM_STARTUP_REMOTE;
+            break;
+
+        case APIPC_SM_STARTUP_REMOTE:
+            if(!apipc_startup_remote())
             {
-                plobj = l_apipc_obj;
-                obj_idx = 0;
                 apipc_app_sm = APIPC_SM_STARTED;
+                IPCLtoRFlagSet(APIPC_FLAG_APP_START);
             }
-            break;
-
-        case APIPC_SM_IDLE:
-            break;
-
-        case APIPC_SM_STARTUP_REMOTE_CONFIG:
-            if(!apipc_startup_config())
-                apipc_app_sm = APIPC_SM_STARTED;
             break;
 
         case APIPC_SM_STARTED:
-            apipc_process_messages();
-            apipc_proc_obj(plobj++);
 
-            if(++obj_idx >= APIPC_MAX_OBJ)
-            {
-                plobj = l_apipc_obj;
-                obj_idx = 0;
-            }
+            for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++, plobj++)
+                apipc_proc_obj(plobj);
 
+            break;
+
+        case APIPC_SM_IDLE:
             break;
     }
 
 }
 
-enum apipc_rc apipc_startup_config(void)
+enum apipc_rc apipc_startup_remote(void)
 {
-    static enum apipc_rc rc;
-    static enum apipc_startup_sm apipc_startup_sm = APIPC_SU_SM_UNKNOWN;
-    static struct apipc_obj *plobj;
+    enum apipc_rc rc;
+    struct apipc_obj *plobj;
+    uint16_t obj_idx;
 
-    static uint16_t obj_idx;
-    static uint16_t startup_finished = 0;
+    plobj = l_apipc_obj;
+    rc = APIPC_RC_SUCCESS;
 
-
-    switch(apipc_startup_sm)
+    for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++, plobj++)
     {
-        case APIPC_SU_SM_UNKNOWN:
-            apipc_startup_sm = APIPC_SU_SM_INIT;
+        apipc_proc_obj(plobj);
 
-        case APIPC_SU_SM_INIT:
-
-            rc = APIPC_RC_FAIL;
-            startup_finished = 1;
-            plobj = l_apipc_obj;
-            obj_idx = 0;
-            apipc_startup_sm = APIPC_SU_SM_STARTING;
-            break;
-
-        case APIPC_SU_SM_STARTING:
-
-            apipc_proc_obj(plobj);
-
-            if(plobj->obj_sm != APIPC_OBJ_SM_FREE && plobj->obj_sm != APIPC_OBJ_SM_IDLE)
-                startup_finished = 0;
-
-            plobj++;
-            obj_idx++;
-
-            if(obj_idx >= APIPC_MAX_OBJ)
-            {
-                if(startup_finished)
-                    apipc_startup_sm = APIPC_SU_SM_FINISHED;
-                else
-                    apipc_startup_sm = APIPC_SU_SM_INIT;
-            }
-            break;
-
-        case APIPC_SU_SM_FINISHED:
-            rc = APIPC_RC_SUCCESS;
-            break;
-
+        if(plobj->obj_sm != APIPC_OBJ_SM_FREE && plobj->obj_sm != APIPC_OBJ_SM_IDLE)
+        	rc = APIPC_RC_FAIL;
     }
 
     return rc;

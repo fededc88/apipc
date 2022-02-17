@@ -64,11 +64,11 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask);
 
 
 /**
- * @fn apipc_startup_config
+ * @fn apipc_startup_remote
  *
  * @brief Start a comunication over IPC API 
  */
-enum apipc_rc apipc_startup_config(void);
+enum apipc_rc apipc_startup_remote(void);
 
 /**
  * @fn apipc_app

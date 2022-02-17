@@ -60,21 +60,9 @@
 enum apipc_sm
 {
     APIPC_SM_UNKNOWN = 0,
-    APIPC_SM_INIT,
+    APIPC_SM_STARTUP_REMOTE,
     APIPC_SM_IDLE,
-    APIPC_SM_STARTUP_REMOTE_CONFIG,
-    APIPC_SM_READING,
-    APIPC_SM_WRITING,
-    APIPC_SM_WAITTING_RESPONSE,
     APIPC_SM_STARTED
-};
-
-enum apipc_startup_sm
-{
-    APIPC_SU_SM_UNKNOWN = 0,
-    APIPC_SU_SM_INIT,
-    APIPC_SU_SM_STARTING,
-    APIPC_SU_SM_FINISHED,
 };
 
 enum apipc_obj_sm
@@ -115,7 +103,7 @@ enum apipc_flags
 {
     APIPC_FLAG_API_INITED = IPC_FLAG4, /* Local API implementation is inited */
     APIPC_FLAG_SRAM_ACCES = IPC_FLAG5, /* Local (CPU1) granted GSMEM acces to CPU2 */
-
+    APIPC_FLAG_APP_START = IPC_FLAG6,  /* apipc_app started! */
 
     IPC_FLAG_L_R_ADDR = IPC_FLAG19,
     IPC_FLAG_BLOCK_RECEIVED = IPC_FLAG21,
