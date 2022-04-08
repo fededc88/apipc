@@ -1,17 +1,23 @@
-/******************************************************************************
- *                                                                             *
- *    file     : Ipc_Driver_app.c
- *    project  : Dual Core Inverter KMT.pjt
- *    authors  : Federico D. Ceccarelli	 
- *                                                                             *
+/**
+ *
+ *  \file ipc.c
+ *
+ *  project Dual Core Inverter KMT.pjt
+ *
+ *  \author Federico D. Ceccarelli	 
+ *
  *******************************************************************************
- *    Description:
- *		  This is an implementation of the IPC driver for the KMT
- *		  dual core project purposes.	
+ *
+ * \brief apipc implementation.
+ *
+ * apipc is an ipc_driver library implementation for TMS320C28x Texas
+ * Instruments cores. The api present a bunch of routines to simplify data
+ * tranfer between cores.
  *	
  *******************************************************************************
- * Version 1.0 	10/05/2021
- *******************************************************************************/
+ * Version 0.1 	10/05/2021
+ ******************************************************************************
+ */
 
 #include "F2837xD_device.h"        // F2837xD Headerfile Include File
 #include "F2837xD_Examples.h"      // F2837xD Examples Include File
@@ -20,28 +26,40 @@
 #include "../lib/mymalloc/mymalloc.h"
 #include "../lib/circular_buffer/buffer.h"
 
-/* ipclib shared buffers space allocation */
-// NOTE: space is allocated depending on the .cmd file included in the project
+/**
+ * \defgroup apipc_data_sections apipc shared buffers space allocation
+ *
+ * \note space is allocated depending on the .cmd file included in the project
+ * @{*/
 #pragma DATA_SECTION(cl_r_w_data,".cpul_cpur_data");
 #pragma DATA_SECTION(l_apipc_obj,".base_cpul_cpur_addr");
 #pragma DATA_SECTION(r_apipc_obj,".base_cpur_cpul_addr");
+/** @}*/
 
-/* ipclib shared buffers space declaration */
-uint16_t  cl_r_w_data[CL_R_W_DATA_LENGTH];            // mapped to .cpul_cpur_data of shared RAM owned by local cpu.
-struct apipc_obj l_apipc_obj[APIPC_MAX_OBJ]; // mapped to .base_cpul_cpur_addr of shared RAM owned by local cpu.
-struct apipc_obj r_apipc_obj[APIPC_MAX_OBJ];   // mapped to .base_cpur_cpul_addr of shared RAM owned by remote cpu.
+/** 
+ * \defgrup apipc_data_declaration ipclib shared buffers space declaration 
+ * @{*/
+uint16_t  cl_r_w_data[CL_R_W_DATA_LENGTH];   /**< mapped to .cpul_cpur_data of shared RAM owned by local cpu. */
+struct apipc_obj l_apipc_obj[APIPC_MAX_OBJ]; /**< mapped to .base_cpul_cpur_addr of shared RAM owned by local cpu. */
+struct apipc_obj r_apipc_obj[APIPC_MAX_OBJ]; /**< mapped to .base_cpur_cpul_addr of shared RAM owned by remote cpu. */
+/** @}*/
 
-/* IPC API Drivers handlers declaration. */
-// NOTE: Should be declared one handler for every interrupt
-volatile tIpcController g_sIpcController1;
-volatile tIpcController g_sIpcController2;
+/** 
+ * \defgroup ipc_handlers IPC Drivers handlers declaration. 
+ *
+ * \note Should be declared one handler for every interrupt
+ * @{
+ */
+volatile tIpcController g_sIpcController1; /**< INT0 IPC Drivers handler. */
+volatile tIpcController g_sIpcController2; /**< INT1 IPC Drivers handler. */
+/** @}*/
 
-/* mymalloc API handler declaration. */
+/** mymalloc API handler declaration. */
 mymalloc_handler l_r_w_data_h;
 
-/* circular_buffer handler declaration. */
+/** circular_buffer handler declaration. */
 circular_buffer_handler message_cbh;
-/* ipc mesasages array memory allocation */
+/** ipc mesasages array memory allocation */
 tIpcMessage message_array[APIPC_MAX_OBJ];
 
 /* statics functions prototipes declarations */
@@ -57,7 +75,7 @@ static enum apipc_rc apipc_process_messages(void);
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
 {
-    /**
+    /*
      * Each CPU owns different GSxM blocks of memory to send data & pointer address
      * to the remote core.
      * If a core master a block of GSxM RAM it can R/W/Fetc it.
@@ -157,8 +175,8 @@ void apipc_init(void)
     apipc_check_remote_cpu_init();
 }
 
-/* apipc_register_obj: register an obj parameters to be able to tranfer between
- * cores */
+/* apipc_register_obj: register data as an apipc obj to be able to be tranfer
+ * between cores */
 enum apipc_rc apipc_register_obj(uint16_t obj_idx, enum apipc_obj_type obj_type,
                                  void *paddr, size_t size, uint16_t startup)
 {
@@ -195,8 +213,7 @@ enum apipc_obj_sm apipc_obj_state(uint16_t obj_idx)
 }
 
 
-/* apipc_send: request transfer an object on demand. object should have been
- * inited to apipc_obj_sm_started to function */
+/* apipc_send: request transfer an object on demand. */
 ram_func enum apipc_rc apipc_send(uint16_t obj_idx)
 {
     enum apipc_rc rc;
@@ -251,7 +268,8 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
     return rc;
 }
 
-/* apipc_write: */
+/* apipc_write: to write a value to the remote core apipc interacts with the
+ * ipc driver according to the obj type */
 static enum apipc_rc apipc_write(uint16_t obj_idx)
 {
     enum apipc_rc rc;
@@ -262,6 +280,7 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
     uint32_t ulData;
     uint32_t ulMask;
 
+    /* initialize local variables */
     rc = APIPC_RC_SUCCESS;
     plobj = &l_apipc_obj[obj_idx];
     probj = &r_apipc_obj[obj_idx];
@@ -352,6 +371,9 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
     return rc;
 }
 
+/*
+ * apipc_proc_obj - 
+ */
 static void apipc_proc_obj(struct apipc_obj *plobj)
 {
     switch(plobj->obj_sm)
@@ -368,6 +390,7 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                 break;
             }
 
+            // Init an obj transmition
         case APIPC_OBJ_SM_INIT:
                 plobj->retry = 3;
                 plobj->obj_sm = APIPC_OBJ_SM_WRITING;
@@ -546,6 +569,7 @@ static void apipc_message_handler (tIpcMessage *psMessage)
     }
 }
 
+/* apipc_app - apipc application */
 void apipc_app(void)
 {
     static enum apipc_sm apipc_app_sm = APIPC_SM_UNKNOWN;
@@ -561,7 +585,7 @@ void apipc_app(void)
     {
         case APIPC_SM_UNKNOWN:
             if(IPCRtoLFlagBusy(APIPC_FLAG_API_INITED) && IPCLtoRFlagBusy(APIPC_FLAG_API_INITED))
-#if defined( CPU2)
+#if defined( CPU2 )
                 if(IPCRtoLFlagBusy(APIPC_FLAG_APP_START))
 #endif
                     apipc_app_sm = APIPC_SM_STARTUP_REMOTE;
