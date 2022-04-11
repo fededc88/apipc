@@ -139,7 +139,7 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask);
 
 
 /**
- * @brief Initialize data on local object on the remote core 
+ * @brief Initialize local object data on the remote core 
  *
  * To be transmited, variables and blocks not only need to be registered as
  * objects but also their SM needs to be initialized. If startup flag is marked,

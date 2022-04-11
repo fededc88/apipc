@@ -27,27 +27,31 @@
 #include "../lib/circular_buffer/buffer.h"
 
 /**
- * \defgroup apipc_data_sections apipc shared buffers space allocation
+ * \defgroup apipc_gsram_alloc apipc symbols allocation
+ *
+ * apipc implements symbols that should be allocated and linked to specifics
+ * memory spaces and directions. Those memory spaces corresponds to gsram and
+ * are defined in the .cmd file included with the project.
  *
  * \note space is allocated depending on the .cmd file included in the project
  * @{*/
-#pragma DATA_SECTION(cl_r_w_data,".cpul_cpur_data");
-#pragma DATA_SECTION(l_apipc_obj,".base_cpul_cpur_addr");
-#pragma DATA_SECTION(r_apipc_obj,".base_cpur_cpul_addr");
+#pragma DATA_SECTION(cl_r_w_data,".cpul_cpur_data"); /**< cl_r_w_data is allocated to shared RAM .cpul_cpur_data space. */
+#pragma DATA_SECTION(l_apipc_obj,".base_cpul_cpur_addr"); /**< l_apipc_obj mapped to shared RAM .base_cpul_cpur_addr space. */
+#pragma DATA_SECTION(r_apipc_obj,".base_cpur_cpul_addr"); /**< r_apipc_obj mapped to shared RAM .base_cpur_cpul_addr space. */
 /** @}*/
 
 /** 
- * \defgrup apipc_data_declaration ipclib shared buffers space declaration 
+ * \defgrup apipc_data_declaration ipclib shared buffers space declarations
  * @{*/
-uint16_t  cl_r_w_data[CL_R_W_DATA_LENGTH];   /**< mapped to .cpul_cpur_data of shared RAM owned by local cpu. */
-struct apipc_obj l_apipc_obj[APIPC_MAX_OBJ]; /**< mapped to .base_cpul_cpur_addr of shared RAM owned by local cpu. */
-struct apipc_obj r_apipc_obj[APIPC_MAX_OBJ]; /**< mapped to .base_cpur_cpul_addr of shared RAM owned by remote cpu. */
+uint16_t  cl_r_w_data[CL_R_W_DATA_LENGTH];   /**< Local to Remote data space */
+struct apipc_obj l_apipc_obj[APIPC_MAX_OBJ]; /**< Local apipc objects buffer. */
+struct apipc_obj r_apipc_obj[APIPC_MAX_OBJ]; /**< Remote apipc objects buffer. */
 /** @}*/
 
 /** 
  * \defgroup ipc_handlers IPC Drivers handlers declaration. 
  *
- * \note Should be declared one handler for every interrupt
+ * \note Should be declared one IPC handler for every interrupt
  * @{
  */
 volatile tIpcController g_sIpcController1; /**< INT0 IPC Drivers handler. */
@@ -62,7 +66,8 @@ circular_buffer_handler message_cbh;
 /** ipc mesasages array memory allocation */
 tIpcMessage message_array[APIPC_MAX_OBJ];
 
-/* statics functions prototipes declarations */
+/** statics functions prototipes declarations
+* @{*/
 static void apipc_sram_acces_config(void);
 static void apipc_check_remote_cpu_init(void);
 static void apipc_init_objs(void);
@@ -71,6 +76,7 @@ static void apipc_cmd_response (tIpcMessage *psMessage);
 static void apipc_message_handler (tIpcMessage *psMessage);
 static enum apipc_rc apipc_write(uint16_t obj_idx);
 static enum apipc_rc apipc_process_messages(void);
+/** @}*/
 
 /* apipc_sram_acces_config: */
 static void apipc_sram_acces_config(void)
@@ -138,6 +144,7 @@ static void apipc_init_objs(void)
 
     plobj = l_apipc_obj;
 
+    /* objs are initialized making sure that paddr == NULL */
     for(obj_idx = 0; obj_idx < APIPC_MAX_OBJ; obj_idx++, plobj++)
         plobj->paddr = NULL;
 }
@@ -268,7 +275,7 @@ enum apipc_rc apipc_flags_clear_bits(uint16_t obj_idx, uint32_t bmask)
     return rc;
 }
 
-/* apipc_write: to write a value to the remote core apipc interacts with the
+/* apipc_write: to transmit a value to the remote core apipc interacts with the
  * ipc driver according to the obj type */
 static enum apipc_rc apipc_write(uint16_t obj_idx)
 {
@@ -285,10 +292,11 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
     plobj = &l_apipc_obj[obj_idx];
     probj = &r_apipc_obj[obj_idx];
 
-    /* Check that l & r objects are initialized */
+    /* Check that l & r objects were initialized */
     if( (probj->paddr == NULL) || (plobj->paddr == NULL) )
         return APIPC_RC_FAIL;
 
+        /* request ipc api write according to the obj type */
     switch(plobj->type)
     {
         case APIPC_OBJ_TYPE_BLOCK:
@@ -302,9 +310,10 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
                 break; 
             }
 
-            // Place the data to write in shared memory
+            /* Place data to be writen in shared memory */
             u16memcpy(plobj->pGSxM, plobj->paddr, plobj->len);
 
+            /* request ipc driver write */
             if(STATUS_FAIL == IPCLtoRBlockWrite(&g_sIpcController2,
                                                 (uint32_t)probj->paddr, 
                                                 (uint32_t)plobj->pGSxM,
@@ -319,6 +328,7 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
 
         case APIPC_OBJ_TYPE_DATA:
 
+            /* retrieve obj data length */
             if(plobj->len == IPC_LENGTH_16_BITS)
                 ulData = (uint32_t) *(uint16_t *)plobj->paddr;
 
@@ -331,6 +341,7 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
                 break;
             }
 
+            /* request ipc driver write */
             if(STATUS_FAIL == IPCLtoRDataWrite(&g_sIpcController2,
                                                (uint32_t)probj->paddr,
                                                ulData, (uint16_t)plobj->len,
@@ -340,15 +351,18 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
 
         case APIPC_OBJ_TYPE_FLAGS:
 
+            /* retrieve obj data length */
             if(plobj->len == IPC_LENGTH_16_BITS)
                 ulMask = (uint32_t) *(uint16_t *)plobj->paddr;
 
             else if(plobj->len > IPC_LENGTH_32_BITS)
                 ulMask = (uint32_t) *(uint32_t *)plobj->paddr;
 
+            /* request ipc driver write */
             if( APIPC_RC_FAIL == apipc_flags_set_bits(plobj->idx, ulMask))
                 rc = APIPC_RC_FAIL;
 
+            /* request ipc driver write */
             if( APIPC_RC_FAIL == apipc_flags_clear_bits(plobj->idx, ~ulMask))
                 rc = APIPC_RC_FAIL;
 
@@ -356,8 +370,10 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
 
         case APIPC_OBJ_TYPE_FUNC_CALL:
 
+            /* retrieve function obj type argument */
             ulData = (uint32_t) plobj->payload;
 
+            /* request ipc driver write */
             if(STATUS_FAIL == IPCLtoRFunctionCall(&g_sIpcController2,
                                                (uint32_t)probj->paddr, ulData,
                                                DISABLE_BLOCKING))
@@ -371,9 +387,7 @@ static enum apipc_rc apipc_write(uint16_t obj_idx)
     return rc;
 }
 
-/*
- * apipc_proc_obj - 
- */
+/* apipc_proc_obj - apipc obj state machine process */
 static void apipc_proc_obj(struct apipc_obj *plobj)
 {
     switch(plobj->obj_sm)
@@ -390,8 +404,11 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
                 break;
             }
 
-            // Init an obj transmition
+        /* obj transmition process starst here */
         case APIPC_OBJ_SM_INIT:
+        /* 
+         * Every obj transmit process starts through this state.
+         */
                 plobj->retry = 3;
                 plobj->obj_sm = APIPC_OBJ_SM_WRITING;
 
@@ -465,9 +482,10 @@ static void apipc_proc_obj(struct apipc_obj *plobj)
     }
 }
 
+/* apipc_cmd_response - apipc response the received message over ipc to ack
+ * reception */
 static void apipc_cmd_response (tIpcMessage *psMessage)
 {
-
     enum apipc_msg_cmd cmd_response;
      uint16_t *urAddess = NULL;
      uint32_t ulDataW1 = 0;
@@ -475,6 +493,7 @@ static void apipc_cmd_response (tIpcMessage *psMessage)
 
     cmd_response = (enum apipc_msg_cmd) psMessage->ulcommand;
 
+    /* build response according to received ipc command */
     switch(cmd_response)
     {
         case APIPC_MSG_CMD_FUNC_CALL_RSP:
@@ -501,10 +520,12 @@ static void apipc_cmd_response (tIpcMessage *psMessage)
             return;
     }
 
+    /* request ipc driver write */
     IPCLtoRSendMessage(&g_sIpcController2,(uint32_t) APIPC_MESSAGE,
             (uint32_t) urAddess, ulDataW1, ulDataW2, DISABLE_BLOCKING);
 }
 
+/* apipc_message_handler - handle the received messege */
 static void apipc_message_handler (tIpcMessage *psMessage)
 {
     enum apipc_msg_cmd ulCommand;
@@ -515,6 +536,7 @@ static void apipc_message_handler (tIpcMessage *psMessage)
     struct apipc_obj *plobj;
     struct apipc_obj *probj;
 
+    /* initialize local variables */
     plobj = &l_apipc_obj[obj_idx];
     probj = &r_apipc_obj[obj_idx];
 
@@ -526,6 +548,7 @@ static void apipc_message_handler (tIpcMessage *psMessage)
         if(pusRAddress == probj->paddr)
             break;
 
+    /* take actions according to the received ipc command */
     switch(ulCommand)
     {
         case APIPC_MSG_CMD_FUNC_CALL_RSP:
@@ -554,6 +577,7 @@ static void apipc_message_handler (tIpcMessage *psMessage)
             break;
     }
     
+    /* evolve obj sm */
     switch (plobj->obj_sm)
     {
         case APIPC_OBJ_SM_IDLE:
@@ -612,6 +636,7 @@ void apipc_app(void)
 
 }
 
+/* apipc_startup_remote - Initialize local object data on the remote core */
 enum apipc_rc apipc_startup_remote(void)
 {
     enum apipc_rc rc;
@@ -629,6 +654,61 @@ enum apipc_rc apipc_startup_remote(void)
         	rc = APIPC_RC_FAIL;
     }
 
+    return rc;
+}
+
+/* apipc_process_messages - apipc interacs here with ipc driver on received
+ * messages and take action according to the command */
+static enum apipc_rc apipc_process_messages(void)
+{
+    enum apipc_rc rc;
+    tIpcMessage sMessage;
+
+    rc = APIPC_RC_SUCCESS;
+
+    if(!circular_buffer_pop(message_cbh, (void *)&sMessage))
+    {
+        switch(sMessage.ulcommand) 
+        {
+            case IPC_FUNC_CALL:
+                IPCRtoLFunctionCall(&sMessage);
+                apipc_cmd_response(&sMessage);
+                break;
+
+            case IPC_DATA_WRITE:
+                IPCRtoLDataWrite(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case IPC_BLOCK_READ:
+                IPCRtoLBlockRead(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case IPC_BLOCK_WRITE:
+                IPCRtoLBlockWrite(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case IPC_SET_BITS:
+                IPCRtoLSetBits(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case IPC_CLEAR_BITS:
+                IPCRtoLClearBits(&sMessage);
+                apipc_cmd_response (&sMessage);
+                break;
+
+            case APIPC_MESSAGE:
+                apipc_message_handler(&sMessage);
+                break;
+
+            default:
+                rc = APIPC_RC_FAIL;
+                break;
+        }
+    }
     return rc;
 }
 
@@ -687,59 +767,6 @@ interrupt void apipc_ipc1_isr_handler(void)
     
     /* acknowledge the PIE group interrupt. */
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-}
-
-static enum apipc_rc apipc_process_messages(void)
-{
-    enum apipc_rc rc;
-    tIpcMessage sMessage;
-
-    rc = APIPC_RC_SUCCESS;
-
-    if(!circular_buffer_pop(message_cbh, (void *)&sMessage))
-    {
-        switch(sMessage.ulcommand) 
-        {
-            case IPC_FUNC_CALL:
-                IPCRtoLFunctionCall(&sMessage);
-                apipc_cmd_response(&sMessage);
-                break;
-
-            case IPC_DATA_WRITE:
-                IPCRtoLDataWrite(&sMessage);
-                apipc_cmd_response (&sMessage);
-                break;
-
-            case IPC_BLOCK_READ:
-                IPCRtoLBlockRead(&sMessage);
-                apipc_cmd_response (&sMessage);
-                break;
-
-            case IPC_BLOCK_WRITE:
-                IPCRtoLBlockWrite(&sMessage);
-                apipc_cmd_response (&sMessage);
-                break;
-
-            case IPC_SET_BITS:
-                IPCRtoLSetBits(&sMessage);
-                apipc_cmd_response (&sMessage);
-                break;
-
-            case IPC_CLEAR_BITS:
-                IPCRtoLClearBits(&sMessage);
-                apipc_cmd_response (&sMessage);
-                break;
-
-            case APIPC_MESSAGE:
-                apipc_message_handler(&sMessage);
-                break;
-
-            default:
-                rc = APIPC_RC_FAIL;
-                break;
-        }
-    }
-    return rc;
 }
 
 //
