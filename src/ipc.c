@@ -2,8 +2,6 @@
  *
  *  \file ipc.c
  *
- *  project Dual Core Inverter KMT.pjt
- *
  *  \author Federico D. Ceccarelli	 
  *
  *******************************************************************************
